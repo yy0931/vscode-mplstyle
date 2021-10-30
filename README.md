@@ -1,4 +1,4 @@
-# mplstyle
+# mplstyle (Matplotlib)
 
 Language support for matplotlibrc and .mplstyle files
 
