@@ -8,7 +8,7 @@ Intellisense for .mplstyle and matplotlibrc files.
 
 ---
 
-![](./color_provider.png)
+![screenshot](https://raw.githubusercontent.com/yy0931/vscode-mplstyle/master/color_provider.png)
 
 ## Features
 - [x] Syntax highlighting
