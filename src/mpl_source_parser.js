@@ -1,5 +1,5 @@
 const json5 = require("json5")
-const parseMplstyle = require("./parse_mplstyle")
+const parseMplstyle = require("./mplstyle_parser")
 
 /** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string }} Signature */
 
@@ -68,7 +68,7 @@ exports.rcsetupPy = (/** @type {string} */content) => {
 }
 
 exports.matplotlibrc = (/** @type {string} */content) => {
-    /** @type {Map<string, { example: string, comment: string }>} */
+    /** @type {Map<string, { exampleValue: string, comment: string }>} */
     const result = new Map()
     /** @type {string | null} */
     let last = null
@@ -95,7 +95,7 @@ exports.matplotlibrc = (/** @type {string} */content) => {
             console.log(`Parse error: ${line}`)
             continue
         }
-        result.set(pair.key.text, { example: `${pair.key.text}: ${pair.value.text}`, comment: pair.commentStart === null ? "" : line.slice(pair.commentStart + 1).trim() })
+        result.set(pair.key.text, { exampleValue: pair.value.text, comment: pair.commentStart === null ? "" : line.slice(pair.commentStart + 1).trim() })
         last = pair.key.text
     }
     return result

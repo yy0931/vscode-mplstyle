@@ -1,13 +1,12 @@
-const parseMplSource = require("../src/parse_mpl_source")
-const parseMplstyle = require("../src/parse_mplstyle")
+const parseMplSource = require("../src/mpl_source_parser")
+const parseMplstyle = require("../src/mplstyle_parser")
 const fs = require("fs")
-
-const {expect} = require("chai")
+const { expect } = require("chai")
 
 describe("parseMplSource", () => {
     describe("rcsetupPy", () => {
         const signatures = parseMplSource.rcsetupPy(fs.readFileSync("./matplotlib/rcsetup.py").toString())
-        
+
         it("backend", () => {
             expect(signatures.get("backend")).to.deep.equal({ kind: "validate_", type: "backend" })
         })
@@ -30,9 +29,9 @@ describe("parseMplSource", () => {
             expect(signatures.get("figure.subplot.wspace")).to.deep.equal({ kind: "0 <= x < 1" })
         })
     })
-    describe("matplotlibrc", () => {
+    it("matplotlibrc", () => {
         const documentation = parseMplSource.matplotlibrc(fs.readFileSync("./matplotlib/lib/matplotlib/mpl-data/matplotlibrc").toString())
-        expect(documentation.get("axes.axisbelow")).to.deep.equal({ example: "axes.axisbelow: line", comment: `draw axis gridlines and ticks:\n- below patches (True)\n- above patches but below lines ('line')\n- above all (False)` })
+        expect(documentation.get("axes.axisbelow")).to.deep.equal({ exampleValue: "line", comment: `draw axis gridlines and ticks:\n- below patches (True)\n- above patches but below lines ('line')\n- above all (False)` })
     })
 })
 
@@ -42,5 +41,8 @@ describe("parseMplstyle.parseLine", () => {
     })
     it("without comments", () => {
         expect(parseMplstyle.parseLine("  a:  b")).to.deep.equal({ key: { text: "a", start: 2, end: 3 }, value: { text: "b", start: 6, end: 7 }, commentStart: null })
+    })
+    it('comment line', () => {
+        expect(parseMplstyle.parseLine("#### MATPLOTLIBRC FORMAT")).to.deep.equal(null)
     })
 })

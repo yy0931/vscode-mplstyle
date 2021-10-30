@@ -32,7 +32,7 @@ exports.parseAll = (/** @type {string} */content) => {
 /** @returns {Pair | null} */
 exports.parseLine = (/** @type {string} */line) => {
     const commentStart = line.indexOf("#")
-    line = (commentStart === -1 ? line : line.slice(0, commentStart - 1)).trimEnd()
+    line = (commentStart === -1 ? line : line.slice(0, commentStart)).trimEnd()
     const start = line.length - line.trimStart().length
     line = line.trimStart()
     if (line === '') {

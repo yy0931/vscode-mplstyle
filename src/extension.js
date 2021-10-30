@@ -1,9 +1,9 @@
 const fs = require("fs")
 const vscode = require("vscode")
 const path = require("path")
-const parseMplSource = require("./parse_mpl_source")
-const parseMplstyle = require("./parse_mplstyle")
-const typeChecker = require('./type_checker')
+const parseMplSource = require("./mpl_source_parser")
+const parseMplstyle = require("./mplstyle_parser")
+const getTypeChecker = require('./type_checker')
 
 const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
 
@@ -45,12 +45,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             return
         }
         const { rc, errors } = parseMplstyle.parseAll(editor.document.getText())
-        errors.push(...Array.from(rc.values()).flatMap(/** @returns {{ error: string, severity: import("./parse_mplstyle").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
+        errors.push(...Array.from(rc.values()).flatMap(/** @returns {{ error: string, severity: import("./mplstyle_parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
             if (pair.value === null) { return [] }  // missing semicolon
             const signature = signatures.get(pair.key.text)
             if (signature === undefined) { return [] }
-            if (typeChecker.checkType(signature, pair.value.text) === false) {
-                return [{ error: `${pair.value.text} is not assignable to ${typeChecker.reprType(signature)}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
+            const typeChecker = getTypeChecker(signature)
+            if (typeChecker[1](pair.value.text) === false) {
+                return [{ error: `${pair.value.text} is not assignable to ${typeChecker[0]}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
             }
             return []
         }))
@@ -82,35 +83,45 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
         vscode.languages.registerHoverProvider({ language: "mplstyle" }, {
             provideHover(document, position) {
-                const line = parseMplstyle.parseLine(document.lineAt(position.line).text)
-                if (line === null || "error" in line) { return }
-
-                if (line.key.start <= position.character && position.character < line.key.end) {
-                    const signature = signatures.get(line.key.text)
-                    if (signature === undefined) { return }
-                    return new vscode.Hover(
-                        new vscode.MarkdownString()
-                            .appendCodeblock(`${line.key.text}: ${typeChecker.reprType(signature)}`, "python")
-                            .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n#### Example")
-                            .appendCodeblock(documentation.get(line.key.text)?.example ?? "", "mplstyle"),
-                        new vscode.Range(position.line, line.key.start, position.line, line.key.end),
-                    )
-                } else {
-                    return
+                try {
+                    const line = parseMplstyle.parseLine(document.lineAt(position.line).text)
+                    if (line === null || "error" in line) { return }
+    
+                    if (line.key.start <= position.character && position.character < line.key.end) {
+                        const signature = signatures.get(line.key.text)
+                        if (signature === undefined) { return }
+                        return new vscode.Hover(
+                            new vscode.MarkdownString()
+                                .appendCodeblock(`${line.key.text}: ${getTypeChecker(signature)[0]}`, "python")
+                                .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n#### Example")
+                                .appendCodeblock(`${line.key.text}: ${documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
+                            new vscode.Range(position.line, line.key.start, position.line, line.key.end),
+                        )
+                    } else {
+                        return
+                    }
+                } catch (err) {
+                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
+                    console.error(err)
                 }
             }
         }),
         vscode.languages.registerCompletionItemProvider({ language: "mplstyle" }, {
             provideCompletionItems(document, position) {
-                return Array.from(signatures.entries()).map(([key, value]) => {
-                    const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                    item.detail = `${key}: ${typeChecker.reprType(value)}`
-                    item.documentation = new vscode.MarkdownString()
-                        .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
-                        .appendCodeblock(documentation.get(key)?.example ?? "", "mplstyle")
-                    item.insertText = new vscode.SnippetString(`${key}: \${1}`)
-                    return item
-                })
+                try {
+                    return Array.from(signatures.entries()).map(([key, value]) => {
+                        const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
+                        item.detail = `${key}: ${getTypeChecker(value)[0]}`
+                        item.documentation = new vscode.MarkdownString()
+                            .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
+                            .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
+                        item.insertText = new vscode.SnippetString(`${key}: \${1:${documentation.get(key)?.exampleValue ?? ""}}`)
+                        return item
+                    })
+                } catch (err) {
+                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
+                    console.error(err)
+                }
             }
         }),
     )
