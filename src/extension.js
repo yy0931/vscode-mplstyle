@@ -4,8 +4,16 @@ const path = require("path")
 const parseMplSource = require("./mpl_source_parser")
 const parseMplstyle = require("./mplstyle_parser")
 const getType = require('./typing')
-
+const json5 = require('json5')
 const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
+
+const json5Parse = (/** @type {string} */text) => {
+    try {
+        return json5.parse(text)
+    } catch (err) {
+        return err
+    }
+}
 
 const loadDocs = (/** @type {string} */extensionPath) => {
     // Read and parse matplotlib/rcsetup.py
@@ -35,9 +43,52 @@ const loadDocs = (/** @type {string} */extensionPath) => {
     }
 }
 
+/** https://github.com/matplotlib/matplotlib/blob/main/lib/matplotlib/colors.py#L195 */
+const toRGBA = (/** @type {string} */value, /** @type {Map<string, readonly [number, number, number, number]>} */colorMap) => {
+    // none
+    if (value.toLowerCase() === "none") {
+        return new vscode.Color(0, 0, 0, 0)
+    }
+
+    // red, blue, etc.
+    const color = colorMap.get(value)
+    if (color !== undefined) {
+        return new vscode.Color(...color)
+    }
+
+    // FFFFFF
+    if (/^[a-f0-9]{6}$/i.test(value)) {
+        return new vscode.Color(
+            parseInt(value.slice(0, 2), 16) / 256,
+            parseInt(value.slice(2, 4), 16) / 256,
+            parseInt(value.slice(4, 6), 16) / 256,
+            1.0,
+        )
+    }
+
+    // FFFFFFFF
+    if (/^[a-f0-9]{8}$/i.test(value)) {
+        return new vscode.Color(
+            parseInt(value.slice(0, 2), 16) / 256,
+            parseInt(value.slice(2, 4), 16) / 256,
+            parseInt(value.slice(4, 6), 16) / 256,
+            parseInt(value.slice(6, 8), 16) / 256,
+        )
+    }
+
+    // 0.0 = black, 1.0 = white
+    const x = json5Parse(value)
+    if (typeof x === "number") {
+        return new vscode.Color(x, x, x, 1.0)
+    }
+
+    return null
+}
+
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     let { documentation, signatures } = loadDocs(context.extensionPath)
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
+    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
     const diagnose = () => {
         const editor = vscode.window.activeTextEditor
@@ -68,9 +119,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         diagnosticCollection,
         vscode.window.onDidChangeActiveTextEditor(() => { diagnose() }),
         vscode.window.onDidChangeTextEditorOptions(() => { diagnose() }),
-		vscode.workspace.onDidOpenTextDocument(() => { diagnose() }),
-		vscode.workspace.onDidChangeConfiguration(() => { diagnose() }),
-		vscode.workspace.onDidChangeTextDocument(() => { diagnose() }),
+        vscode.workspace.onDidOpenTextDocument(() => { diagnose() }),
+        vscode.workspace.onDidChangeConfiguration(() => { diagnose() }),
+        vscode.workspace.onDidChangeTextDocument(() => { diagnose() }),
         vscode.workspace.onDidCloseTextDocument((doc) => { diagnosticCollection.delete(doc.uri) }),
 
         vscode.workspace.onDidChangeConfiguration((ev) => {
@@ -86,7 +137,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 try {
                     const line = parseMplstyle.parseLine(document.lineAt(position.line).text)
                     if (line === null) { return }
-    
+
                     if (line.key.start <= position.character && position.character < line.key.end) {
                         const signature = signatures.get(line.key.text)
                         if (signature === undefined) { return }
@@ -133,8 +184,51 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     console.error(err)
                 }
             }
+        }),
+        vscode.languages.registerColorProvider({ language: "mplstyle" }, {
+            provideDocumentColors(document) {
+                try {
+                    /** @type {vscode.ColorInformation[]} */
+                    const result = []
+                    for (const { pair, line } of parseMplstyle.parseAll(document.getText()).rc.values()) {
+                        const signature = signatures.get(pair.key.text)
+                        if (signature === undefined || !("type" in signature) || pair.value === null) { continue }
+                        if (signature.type.includes("color")) { // color or color_or_auto
+                            const color = toRGBA(pair.value.text, colorMap)
+                            if (color !== null) {
+                                result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), color))
+                            }
+                        } else if (signature.type === "cycler") {
+                            /** @type {RegExpExecArray | null} */
+                            let matches = null
+                            const pattern = /'(?:\w|\d|-)*'|"(?:\w|\d|-)*"/gi
+                            while ((matches = pattern.exec(pair.value.text)) !== null) {
+                                const color = toRGBA(pair.value.text.slice(matches.index + 1, matches.index + matches[0].length - 1), colorMap)
+                                if (color !== null) {
+                                    result.push(new vscode.ColorInformation(
+                                        new vscode.Range(line, pair.value.start + matches.index + 1, line, pair.value.start + matches.index + matches[0].length - 1),
+                                        color,
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                    return result
+                } catch (err) {
+                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
+                    console.error(err)
+                }
+            },
+            provideColorPresentations(color, ctx) {
+                return [new vscode.ColorPresentation(
+                    ("00" + Math.floor(color.red * 255).toString(16).toUpperCase()).slice(-2) +
+                    ("00" + Math.floor(color.green * 255).toString(16).toUpperCase()).slice(-2) +
+                    ("00" + Math.floor(color.blue * 255).toString(16).toUpperCase()).slice(-2) +
+                    (color.alpha === 1 ? "" : ("00" + Math.floor(color.alpha * 255).toString(16).toUpperCase()).slice(-2)),
+                )]
+            }
         })
     )
 }
 
-exports.deactivate = () => {}
+exports.deactivate = () => { }
