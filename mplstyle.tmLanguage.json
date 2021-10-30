@@ -3,7 +3,17 @@
     "scopeName": "source.mplstyle",
     "patterns": [
         {
-            "match": "^((?:\\w|-|[.])*)(:)?",
+            "name": "comment.line.number-sign.mplstyle",
+            "begin": "(\\#)",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.comment.mplstyle"
+                }
+            },
+            "end": "($)"
+        },
+        {
+            "match": "^\\s*((?:\\w|-|[.])*)(:)?",
             "captures": {
                 "1": {
                     "name": "entity.name.label.mplstyle"
@@ -21,16 +31,6 @@
         {
             "name": "constant.numeric.mplstyle",
             "match": "\\b[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\b"
-        },
-        {
-            "name": "comment.line.number-sign.mplstyle",
-            "begin": "(\\#)",
-            "beginCaptures": {
-                "1": {
-                    "name": "punctuation.definition.comment.mplstyle"
-                }
-            },
-            "end": "($)"
         },
         {
             "name": "string.unquoted.plain.out.mplstyle",
