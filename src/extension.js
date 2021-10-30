@@ -85,7 +85,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             provideHover(document, position) {
                 try {
                     const line = parseMplstyle.parseLine(document.lineAt(position.line).text)
-                    if (line === null || "error" in line) { return }
+                    if (line === null) { return }
     
                     if (line.key.start <= position.character && position.character < line.key.end) {
                         const signature = signatures.get(line.key.text)
@@ -109,15 +109,25 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         vscode.languages.registerCompletionItemProvider({ language: "mplstyle" }, {
             provideCompletionItems(document, position) {
                 try {
-                    return Array.from(signatures.entries()).map(([key, value]) => {
-                        const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                        item.detail = `${key}: ${getTypeChecker(value)[0]}`
-                        item.documentation = new vscode.MarkdownString()
-                            .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
-                            .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
-                        item.insertText = new vscode.SnippetString(`${key}: \${1:${documentation.get(key)?.exampleValue ?? ""}}`)
-                        return item
-                    })
+                    if (document.lineAt(position.line).text.slice(0, position.character).includes(":")) {
+                        // Value
+                        const line = parseMplstyle.parseLine(document.lineAt(position.line).text)
+                        if (line === null) { return }
+                        const signature = signatures.get(line.key.text)
+                        if (signature === undefined) { return }
+                        return getTypeChecker(signature)[2].map((v) => new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant))
+                    } else {
+                        // Key
+                        return Array.from(signatures.entries()).map(([key, value]) => {
+                            const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
+                            item.detail = `${key}: ${getTypeChecker(value)[0]}`
+                            item.documentation = new vscode.MarkdownString()
+                                .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
+                                .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
+                            item.insertText = new vscode.SnippetString(`${key}: \${1}`)
+                            return item
+                        })
+                    }
                 } catch (err) {
                     vscode.window.showErrorMessage(`mplstyle: ${err}`)
                     console.error(err)

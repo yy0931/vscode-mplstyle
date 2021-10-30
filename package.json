@@ -1,7 +1,7 @@
 {
 	"name": "mplstyle",
 	"displayName": "mplstyle (Matplotlib)",
-	"description": "Language support for matplotlibrc and .mplstyle files",
+	"description": "Intellisense for .mplstyle and matplotlibrc files",
 	"version": "1.1.0",
 	"license": "MIT",
 	"publisher": "yy0931",

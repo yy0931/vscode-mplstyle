@@ -1,6 +1,6 @@
 # mplstyle (Matplotlib)
 
-Language support for matplotlibrc and .mplstyle files
+Intellisense for .mplstyle and matplotlibrc files.
 
 ![screenshot](https://raw.githubusercontent.com/yy0931/vscode-mplstyle/master/screenshot.png)
 
