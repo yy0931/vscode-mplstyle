@@ -5,6 +5,11 @@
 	"version": "1.1.0",
 	"license": "MIT",
 	"publisher": "yy0931",
+	"keywords": [
+		"matplotlib",
+		"pyplot",
+		"mplstyle"
+	],
 	"engines": {
 		"vscode": "^1.53.0"
 	},
