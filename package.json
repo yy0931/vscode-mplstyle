@@ -1,0 +1,58 @@
+{
+	"name": "mplstyle",
+	"displayName": "mplstyle (matplotlibrc)",
+	"description": "Language support for matplotlibrc and .mplstyle files",
+	"version": "1.0.0",
+	"license": "MIT",
+	"publisher": "yy0931",
+	"engines": {
+		"vscode": "^1.53.0"
+	},
+	"categories": [
+		"Programming Languages"
+	],
+	"activationEvents": [
+		"onLanguage:mplstyle"
+	],
+	"main": "./src/extension.js",
+	"contributes": {
+		"languages": [
+			{
+				"id": "mplstyle",
+				"extensions": [
+					"matplotlibrc",
+					".mplstyle"
+				],
+				"configuration": "./language-configuration.json"
+			}
+		],
+		"grammars": [
+			{
+				"language": "mplstyle",
+				"scopeName": "source.mplstyle",
+				"path": "./mplstyle.tmLanguage.json"
+			}
+		],
+		"configuration": {
+			"type": "object",
+			"title": "mplstyle",
+			"properties": {
+				"mplstyle.matplotlibPath": {
+					"type": "string",
+					"default": "",
+					"description": "path of matplotlib, e.g. /home/foo/.local/lib/python3.10/site-packages/matplotlib"
+				}
+			}
+		}
+	},
+	"scripts": {
+		"test": "mocha"
+	},
+	"dependencies": {
+		"json5": "^2.2.0"
+	},
+	"devDependencies": {
+		"chai": "^4.3.4",
+		"mocha": "^9.1.3"
+	}
+}

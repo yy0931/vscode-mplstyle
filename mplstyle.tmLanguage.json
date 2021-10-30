@@ -1,0 +1,25 @@
+{
+    "name": "mplstyle",
+    "scopeName": "source.mplstyle",
+    "patterns": [
+        {
+            "comment": "https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L142-L142 and // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L199",
+            "name": "constant.language.mplstyle",
+            "match": "(?i)\\b(?:t|y|yes|on|true|f|n|no|off|false|none)\\b"
+        },
+        {
+            "name": "constant.numeric.mplstyle",
+            "match": "\\b[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\b"
+        },
+        {
+            "name": "comment.line.number-sign.mplstyle",
+            "begin": "(\\#)",
+            "beginCaptures": {
+                "1": {
+                    "name": "punctuation.definition.comment.mplstyle"
+                }
+            },
+            "end": "($)"
+        }
+    ]
+}

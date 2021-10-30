@@ -1,0 +1,9 @@
+{
+	"compilerOptions": {
+		"module": "commonJS",
+		"target": "ESNext",
+		"checkJs": true,
+		"strict": true
+	},
+	"include": ["src", "test"]
+}

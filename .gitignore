@@ -1,0 +1,13 @@
+out
+node_modules
+.vscode-test/
+*.vsix
+.yarn-error.log
+yarn-error.log
+todo.md
+parser.md
+log.txt
+.cache/
+dist/
+example/**
+/src/docs.js
