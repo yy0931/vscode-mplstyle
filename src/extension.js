@@ -48,7 +48,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         errors.push(...Array.from(rc.values()).flatMap(/** @returns {{ error: string, severity: import("./mplstyle_parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
             if (pair.value === null) { return [] }  // missing semicolon
             const signature = signatures.get(pair.key.text)
-            if (signature === undefined) { return [] }
+            if (signature === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
             const typeChecker = getTypeChecker(signature)
             if (typeChecker[1](pair.value.text) === false) {
                 return [{ error: `${pair.value.text} is not assignable to ${typeChecker[0]}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
