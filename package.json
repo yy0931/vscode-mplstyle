@@ -2,9 +2,16 @@
 	"name": "mplstyle",
 	"displayName": "mplstyle (Matplotlib)",
 	"description": "Intellisense for .mplstyle and matplotlibrc files",
-	"version": "1.1.0",
+	"version": "1.1.1",
 	"license": "MIT",
 	"publisher": "yy0931",
+	"repository": {
+		"url": "https://github.com/yy0931/vscode-mplstyle",
+		"type": "git"
+	},
+	"bugs": {
+		"url": "https://github.com/yy0931/vscode-mplstyle/issues"
+	},
 	"keywords": [
 		"matplotlib",
 		"pyplot",
