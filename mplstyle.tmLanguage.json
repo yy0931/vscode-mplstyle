@@ -3,6 +3,17 @@
     "scopeName": "source.mplstyle",
     "patterns": [
         {
+            "match": "^((?:\\w|-|[.])*)(:)?",
+            "captures": {
+                "1": {
+                    "name": "entity.name.label.mplstyle"
+                },
+                "2": {
+                    "name": "punctuation.separator.key-value.mapping.mplstyle"
+                }
+            }
+        },
+        {
             "comment": "https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L142-L142 and // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L199",
             "name": "constant.language.mplstyle",
             "match": "(?i)\\b(?:t|y|yes|on|true|f|n|no|off|false|none)\\b"
@@ -20,6 +31,10 @@
                 }
             },
             "end": "($)"
+        },
+        {
+            "name": "string.unquoted.plain.out.mplstyle",
+            "match": "\\S+"
         }
     ]
 }
