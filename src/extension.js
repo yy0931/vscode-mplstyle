@@ -3,7 +3,7 @@ const vscode = require("vscode")
 const path = require("path")
 const parseMplSource = require("./mpl_source_parser")
 const parseMplstyle = require("./mplstyle_parser")
-const getTypeChecker = require('./type_checker')
+const getType = require('./typing')
 
 const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
 
@@ -49,7 +49,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             if (pair.value === null) { return [] }  // missing semicolon
             const signature = signatures.get(pair.key.text)
             if (signature === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
-            const typeChecker = getTypeChecker(signature)
+            const typeChecker = getType(signature)
             if (typeChecker[1](pair.value.text) === false) {
                 return [{ error: `${pair.value.text} is not assignable to ${typeChecker[0]}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
             }
@@ -92,7 +92,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         if (signature === undefined) { return }
                         return new vscode.Hover(
                             new vscode.MarkdownString()
-                                .appendCodeblock(`${line.key.text}: ${getTypeChecker(signature)[0]}`, "python")
+                                .appendCodeblock(`${line.key.text}: ${getType(signature)[0]}`, "python")
                                 .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n#### Example")
                                 .appendCodeblock(`${line.key.text}: ${documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
                             new vscode.Range(position.line, line.key.start, position.line, line.key.end),
@@ -115,12 +115,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         if (line === null) { return }
                         const signature = signatures.get(line.key.text)
                         if (signature === undefined) { return }
-                        return getTypeChecker(signature)[2].map((v) => new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant))
+                        return getType(signature)[2].map((v) => new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant))
                     } else {
                         // Key
                         return Array.from(signatures.entries()).map(([key, value]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                            item.detail = `${key}: ${getTypeChecker(value)[0]}`
+                            item.detail = `${key}: ${getType(value)[0]}`
                             item.documentation = new vscode.MarkdownString()
                                 .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
                                 .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
@@ -133,7 +133,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     console.error(err)
                 }
             }
-        }),
+        })
     )
 }
 
