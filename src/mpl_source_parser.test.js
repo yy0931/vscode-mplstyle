@@ -4,8 +4,8 @@ const { assert: { deepStrictEqual, include, fail } } = require("chai")
 const path = require("path")
 const { spawnSync } = require("child_process")
 
-describe("parse rcsetup.py", () => {
-    const signatures = mplSourceParser.parseRcsetupPy(fs.readFileSync("./matplotlib/rcsetup.py").toString())
+describe("parse _validators", () => {
+    const signatures = mplSourceParser.parseValidators(fs.readFileSync("./matplotlib/lib/matplotlib/rcsetup.py").toString())
 
     it("backend", () => {
         deepStrictEqual(signatures.get("backend"), { kind: "validate_", type: "backend" })
@@ -33,6 +33,12 @@ describe("parse rcsetup.py", () => {
     })
 })
 
+it("parse _prop_validators", () => {
+    const props = mplSourceParser.parsePropValidators(fs.readFileSync("./matplotlib/lib/matplotlib/rcsetup.py").toString())
+    deepStrictEqual(props.get('color'), { kind: "list", child: { kind: "validate_", type: "color_for_prop_cycle" } })
+    deepStrictEqual(props.get('linewidth'), { kind: "validate_", type: "floatlist" })
+})
+
 describe("parse matplotlibrc", () => {
     it("multi-line comments", () => {
         deepStrictEqual(mplSourceParser.parseMatplotlibrc(`\
@@ -42,9 +48,9 @@ key1: value1 # key1-comment1
 # b
 key2: value2 # key2-comment1
 `), new Map([
-    ['key1', { exampleValue: 'value1', comment: 'key1-comment1\nkey1-comment2' }],
-    ['key2', { exampleValue: 'value2', comment: 'key2-comment1' }],
-]))
+            ['key1', { exampleValue: 'value1', comment: 'key1-comment1\nkey1-comment2' }],
+            ['key2', { exampleValue: 'value2', comment: 'key2-comment1' }],
+        ]))
     })
     it("axes.axisbelow", () => {
         const documentation = mplSourceParser.parseMatplotlibrc(fs.readFileSync("./matplotlib/lib/matplotlib/mpl-data/matplotlibrc").toString())
@@ -60,7 +66,8 @@ describe("read all", () => {
         include(documentation.get("figure.subplot.right")?.comment, 'the right side of the subplots of the figure')
         deepStrictEqual(signatures.has('font.family'), true)
     })
-    it("custom path", () => {
+    it("custom path", function () {
+        this.timeout(20 * 1000)
         const { status, stdout, stderr } = spawnSync(`pip3 show matplotlib`, { shell: true })
         if (status !== 0) {
             fail(stderr.toString())

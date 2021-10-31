@@ -14,22 +14,23 @@ directory.
 """
 
 import ast
+from functools import lru_cache, reduce
+from numbers import Number
 import operator
 import os
 import re
-from functools import lru_cache, reduce
-from numbers import Number
 
 import numpy as np
-# Don't let the original cycler collide with our validating cycler
-from cycler import Cycler
-from cycler import cycler as ccycler
 
 from matplotlib import _api, cbook
-from matplotlib._enums import CapStyle, JoinStyle
 from matplotlib.cbook import ls_mapper
 from matplotlib.colors import Colormap, is_color_like
 from matplotlib.fontconfig_pattern import parse_fontconfig_pattern
+from matplotlib._enums import JoinStyle, CapStyle
+
+# Don't let the original cycler collide with our validating cycler
+from cycler import Cycler, cycler as ccycler
+
 
 # The capitalized forms are needed for ipython at present; this may
 # change for later versions.
@@ -124,8 +125,6 @@ def _listify_validator(scalar_validator, allow_stringlist=False, *,
 
 def validate_any(s):
     return s
-
-
 validate_anylist = _listify_validator(validate_any)
 
 
@@ -584,36 +583,36 @@ validate_dashlist = _listify_validator(validate_floatlist)
 
 
 _prop_validators = {
-    'color': _listify_validator(validate_color_for_prop_cycle,
-                                allow_stringlist=True),
-    'linewidth': validate_floatlist,
-    'linestyle': _listify_validator(_validate_linestyle),
-    'facecolor': validate_colorlist,
-    'edgecolor': validate_colorlist,
-    'joinstyle': _listify_validator(JoinStyle),
-    'capstyle': _listify_validator(CapStyle),
-    'fillstyle': validate_fillstylelist,
-    'markerfacecolor': validate_colorlist,
-    'markersize': validate_floatlist,
-    'markeredgewidth': validate_floatlist,
-    'markeredgecolor': validate_colorlist,
-    'markevery': validate_markeverylist,
-    'alpha': validate_floatlist,
-    'marker': validate_stringlist,
-    'hatch': validate_hatchlist,
-    'dashes': validate_dashlist,
-}
+        'color': _listify_validator(validate_color_for_prop_cycle,
+                                    allow_stringlist=True),
+        'linewidth': validate_floatlist,
+        'linestyle': _listify_validator(_validate_linestyle),
+        'facecolor': validate_colorlist,
+        'edgecolor': validate_colorlist,
+        'joinstyle': _listify_validator(JoinStyle),
+        'capstyle': _listify_validator(CapStyle),
+        'fillstyle': validate_fillstylelist,
+        'markerfacecolor': validate_colorlist,
+        'markersize': validate_floatlist,
+        'markeredgewidth': validate_floatlist,
+        'markeredgecolor': validate_colorlist,
+        'markevery': validate_markeverylist,
+        'alpha': validate_floatlist,
+        'marker': validate_stringlist,
+        'hatch': validate_hatchlist,
+        'dashes': validate_dashlist,
+    }
 _prop_aliases = {
-    'c': 'color',
-    'lw': 'linewidth',
-    'ls': 'linestyle',
-    'fc': 'facecolor',
-    'ec': 'edgecolor',
-    'mfc': 'markerfacecolor',
-    'mec': 'markeredgecolor',
-    'mew': 'markeredgewidth',
-    'ms': 'markersize',
-}
+        'c': 'color',
+        'lw': 'linewidth',
+        'ls': 'linestyle',
+        'fc': 'facecolor',
+        'ec': 'edgecolor',
+        'mfc': 'markerfacecolor',
+        'mec': 'markeredgecolor',
+        'mew': 'markeredgewidth',
+        'ms': 'markersize',
+    }
 
 
 def cycler(*args, **kwargs):
@@ -830,25 +829,25 @@ _validators = {
     # marker props
     "markers.fillstyle": validate_fillstyle,
 
-    # pcolor(mesh) props:
+    ## pcolor(mesh) props:
     "pcolor.shading": ["auto", "flat", "nearest", "gouraud"],
     "pcolormesh.snap": validate_bool,
 
-    # patch props
+    ## patch props
     "patch.linewidth":       validate_float,  # line width in points
     "patch.edgecolor":       validate_color,
     "patch.force_edgecolor": validate_bool,
     "patch.facecolor":       validate_color,  # first color in cycle
     "patch.antialiased":     validate_bool,  # antialiased (no jaggies)
 
-    # hatch props
+    ## hatch props
     "hatch.color":     validate_color,
     "hatch.linewidth": validate_float,
 
-    # Histogram properties
+    ## Histogram properties
     "hist.bins": validate_hist_bins,
 
-    # Boxplot properties
+    ## Boxplot properties
     "boxplot.notch":       validate_bool,
     "boxplot.vertical":    validate_bool,
     "boxplot.whiskers":    validate_whiskers,
@@ -893,7 +892,7 @@ _validators = {
     "boxplot.meanprops.linestyle":       _validate_linestyle,
     "boxplot.meanprops.linewidth":       validate_float,
 
-    # font props
+    ## font props
     "font.family":     validate_stringlist,  # used by text object
     "font.style":      validate_string,
     "font.variant":    validate_string,
@@ -1042,7 +1041,7 @@ _validators = {
     # alpha value of the legend frame
     "legend.framealpha":     validate_float_or_None,
 
-    # the following dimensions are in fraction of the font size
+    ## the following dimensions are in fraction of the font size
     "legend.borderpad":      validate_float,  # units are fontsize
     # the vertical space between the legend entries
     "legend.labelspacing":   validate_float,
@@ -1108,7 +1107,7 @@ _validators = {
     "grid.linewidth":    validate_float,     # in points
     "grid.alpha":        validate_float,
 
-    # figure props
+    ## figure props
     # figure title
     "figure.titlesize":   validate_fontsize,
     "figure.titleweight": validate_fontweight,
@@ -1139,7 +1138,7 @@ _validators = {
     'figure.constrained_layout.h_pad': validate_float,
     'figure.constrained_layout.w_pad': validate_float,
 
-    # Saving figure's properties
+    ## Saving figure's properties
     'savefig.dpi':          validate_dpi,
     'savefig.facecolor':    validate_color_or_auto,
     'savefig.edgecolor':    validate_color_or_auto,
@@ -1219,9 +1218,9 @@ _validators = {
     "animation.ffmpeg_path":  _validate_pathlike,
     # Additional arguments for ffmpeg movie writer (using pipes)
     "animation.ffmpeg_args":  validate_stringlist,
-    # Path to convert binary. If just binary name, subprocess uses $PATH.
+     # Path to convert binary. If just binary name, subprocess uses $PATH.
     "animation.convert_path": _validate_pathlike,
-    # Additional arguments for convert movie writer (using pipes)
+     # Additional arguments for convert movie writer (using pipes)
     "animation.convert_args": validate_stringlist,
 
     # Classic (pre 2.0) compatibility mode

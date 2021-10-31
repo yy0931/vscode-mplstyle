@@ -64,11 +64,11 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
 }
 
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
-    let { documentation, signatures, errors } = mplSourceParser.readAll(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+    let { documentation, signatures, cyclerProps, errors } = mplSourceParser.readAll(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
     for (const err of errors) {
         vscode.window.showErrorMessage(`mplstyle: ${err}.`)
     }
-    
+
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
     const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
@@ -97,6 +97,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         )
     }
 
+    const cycler = {
+        kwargs: Array.from(cyclerProps.entries()).map(([k, v]) => `${k}: ${getType(v).shortLabel}`),
+        label: `label: ${Array.from(cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
+    }
+
     context.subscriptions.push(
         diagnosticCollection,
         vscode.window.onDidChangeActiveTextEditor(() => { diagnose() }),
@@ -112,7 +117,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 for (const err of out.errors) {
                     vscode.window.showErrorMessage(`mplstyle: ${err}.`)
                 }
-                            documentation = out.documentation
+                documentation = out.documentation
                 signatures = out.signatures
             }
         }),
@@ -138,9 +143,10 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         // Value
                         const matches = /^\s*cycler\b/.exec(line.value.text)
                         if (matches !== null && line.value.start + matches.index <= position.character && position.character < line.value.start + matches.index + 'cycler'.length) {
+                            const labelTypes = Array.from(cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")
                             return new vscode.Hover(
                                 new vscode.MarkdownString()
-                                    .appendCodeblock(`cycler('color', values: list[str])\ncycler(*, color: list[str])`, 'python')
+                                    .appendCodeblock(`cycler(*, ${cycler.kwargs.join(", ")})\ncycler(label: ${cycler.label}, values: list)`, 'python')
                                     .appendMarkdown("---\n")
                                     .appendMarkdown("Creates a \`cycler.Cycler\` which cycles over one or more colors simultaneously."),
                                 new vscode.Range(position.line, line.value.start + matches.index, position.line, line.value.start + matches.index + 'cycler'.length),
@@ -264,25 +270,42 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     const textLine = document.lineAt(position.line)
                     const pair = mplstyleParser.parseLine(textLine.text)
                     if (pair === null || pair.value === null) { return }
-                    const left = textLine.text.slice(pair.value.start)
-                    if (/^\s*cycler\b/.test(left)) {
+                    if (/^\s*cycler\b/.test(pair.value.text)) {
                         // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L618-L618
                         // TODO: axes.prop_cycle: cycler(color=["red", "blue"], linestyle=["-", "--"])
-                        const form2 = new vscode.SignatureInformation("cycler('color', values: list[str])")
-                        form2.parameters = [new vscode.ParameterInformation(`'color'`), new vscode.ParameterInformation(`values: list[str]`)]
-                        const form3 = new vscode.SignatureInformation("cycler(*, color: list[str])")
-                        form3.parameters = [new vscode.ParameterInformation('color: list[str]')]
+                        const form2 = new vscode.SignatureInformation(`cycler(${cycler.label}, values: list[str])`)
+                        form2.parameters = [new vscode.ParameterInformation(cycler.label), new vscode.ParameterInformation(`values: list[str]`)]
+                        const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.kwargs.join(", ")})`)
+                        form3.parameters = cycler.kwargs.map((v) => new vscode.ParameterInformation(v))
 
                         form2.documentation = form3.documentation = `Creates a \`cycler.Cycler\` which cycles over one or more colors simultaneously.`
 
                         const h = new vscode.SignatureHelp()
                         h.signatures = [form2, form3]
-                        if (/^\s*cycler\(\w+=/.test(left)) {
+                        if (/^\s*cycler\(\w+=/.test(pair.value.text)) {
+                            // keyword arguments
                             h.activeSignature = 1
+                            const pattern = /[(,]\s*(\w+)\s*=/g
+                            /** @type {RegExpExecArray | null} */
+                            let matches = null
+                            /** @type {string | null} */
+                            let last = null
+                            while (matches = pattern.exec(textLine.text)) {
+                                if (matches.index >= position.character) {
+                                    break
+                                }
+                                last = matches[1]
+                            }
+                            if (last !== null) {
+                                const index = Array.from(cyclerProps.keys()).indexOf(last)
+                                if (index === -1) { return h }
+                                h.activeParameter = index
+                            }
                         } else {
+                            // positional arguments
                             h.activeSignature = 0
+                            h.activeParameter = pair.value.text.split(",").length - 1
                         }
-                        h.activeParameter = left.split(",").length - 1
                         return h
                     }
                 } catch (err) {
@@ -290,7 +313,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     console.error(err)
                 }
             }
-        }, "(", ","),
+        }, "(", ",", "="),
     )
 }
 

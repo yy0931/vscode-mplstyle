@@ -1,15 +1,18 @@
 const json5 = require("json5")
 const parseMplstyle = require("./mplstyle_parser")
 
-/** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string } | { readonly kind: "fixed_length_list", readonly len: number, child: Signature }} Signature */
+/** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string } | { readonly kind: "fixed_length_list", readonly len: number, child: Signature } | { readonly kind: "list", child: Signature }} Signature */
 
-const parseRcsetupPy = (/** @type {string} */content) => {
+/** https://stackoverflow.com/a/3561711/10710682 */
+const escapeRegExp = (/** @type {string} */string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+
+const parseDict = (/** @type {string} */content, /** @type {string} */ variableRegexp) => {
     content = content
         .replace(/\r/g, "")
-        .replace(/^(.|\n)*\n_validators = \{\n/, "") // remove the code before `_validators = {`
+        .replace(new RegExp(String.raw`^(.|\n)*\n${variableRegexp} = \{\n`), "") // remove the code before `_validators = {`
 
-    /** @type {Map<string, Signature>} */
-    const result = new Map()
+    /** @type {{ readonly value: string, readonly key: string }[]} */
+    const result = []
     const lines = content.split("\n").map((line) => line.trim())
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
@@ -22,51 +25,23 @@ const parseRcsetupPy = (/** @type {string} */content) => {
         let matches = null
         // Parse `"foo.bar": validator, # comment`_
         if (matches = /^\s*["']([\w\-_]+(?:\.[\w\-_]+)*)["']\s*:\s*(.*)$/.exec(line)) {
-			const key = matches[1]
-			let value = matches[2]
-			// Read until the next right bracket if the first character is "[" and `value` doesn't include "]".
-			if (value.startsWith('[') && !value.includes(']')) {
-				for (let j = i + 1; j < lines.length; j++) {
-					if (lines[j].includes("]")) {
-						value += lines[j].split("]")[0] + "]"
-						break
-					} else {
-						value += lines[j].replace(/#.*$/, "")
-					}
-				}
-			}
-
-            if (matches = /^validate_(\w+)(?:\s|\W|,|$)/.exec(value)) {                 // validate_bool, validate_float, etc.
-                result.set(key, { kind: "validate_", type: matches[1] })
-            } else if (matches = /^_validate_(\w+)(?:\s|\W|,|$)/.exec(value)) {          // _validate_linestyle, _validate_pathlike, etc.
-                result.set(key, { kind: "validate_", type: matches[1] })
-            } else if (/^_range_validators\["0 <= x <= 1"\](?:\s|\W|,|$)/.test(value)) { // _range_validators["0 <= x <= 1"]
-                result.set(key, { kind: "0 <= x <= 1" })
-            } else if (/^_range_validators\["0 <= x < 1"\](?:\s|\W|,|$)/.test(value)) {  // _range_validators["0 <= x < 1"]
-                result.set(key, { kind: "0 <= x < 1" })
-            } else if (/^JoinStyle(?:\s|\W|,|$)/.test(value)) { // JoinStyle
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L82-L82
-                result.set(key, { kind: "enum", values: ["miter", "round", "bevel"] })
-            } else if (/^CapStyle(?:\s|\W|,|$)/.test(value)) {
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L151-L151
-                result.set(key, { kind: "enum", values: ["butt", "projecting", "round"] })
-            } else if (matches = /^(\[\s*(?:"[^"]*"|'[^']*')\s*(?:,\s*(?:"[^"]*"|'[^']*')\s*)*\])\s*(?:\s|\W|,|$)/.exec(value)) { // ["foo", "bar"]
-                try {
-                    const values = json5.parse(matches[1])
-                    if (Array.isArray(values) && values.every((v) => typeof v === "string")) {
-                        result.set(key, { kind: "enum", values })
-                    } else {
-                        result.set(key, { kind: "untyped", type: value })
+            const key = matches[1]
+            let value = matches[2]
+            // Read until the next right bracket if there is a unmatched parenthesis
+            for (const [left, right] of [["[", "]"], ["(", ")"]]) {
+                if (new RegExp(r`^\w*${escapeRegExp(left)}`).test(value) && !value.includes(right)) {
+                    for (let j = i + 1; j < lines.length; j++) {
+                        if (lines[j].includes(right)) {
+                            value += lines[j].split(right)[0] + right
+                            break
+                        } else {
+                            value += lines[j].replace(/#.*$/, "")
+                        }
                     }
-                } catch (err) {
-                    console.log(`Parse error: ${matches[1]}`)
-                    result.set(key, { kind: "untyped", type: value })
                 }
-            } else if (matches = /^_listify_validator\(validate_(\w+), n=(\d+)\)(?:\s|\W|,|$)/.exec(value)) { // _listify_validator(validate_int, n=2)
-                result.set(key, { kind: 'fixed_length_list', len: +matches[2], child: { kind: 'validate_', type: matches[1] } })
-            } else {
-                result.set(key, { kind: "untyped", type: value })
             }
+            result.push({ value, key })
+
         } else if (!/^\s*(?:#.*)?$/.test(line) && line.startsWith(':')) {
             console.log(`Parse error: ${line}`)
         }
@@ -75,7 +50,62 @@ const parseRcsetupPy = (/** @type {string} */content) => {
     return result
 }
 
-exports.parseRcsetupPy = parseRcsetupPy
+const matchExpr = (/** @type {string} */pattern, /** @type {string} */source) => {
+    return new RegExp(String.raw`^${pattern}(?:\s|\W|,|$)`).exec(source)
+}
+
+const r = String.raw.bind(String)
+
+/** @returns {Signature} */
+const parseValidator = (/** @type {string} */source) => {
+    /** @type {RegExpExecArray | null} */
+    let matches = null
+    if (matches = matchExpr(r`validate_(\w+)`, source)) {                 // validate_bool, validate_float, etc.
+        return { kind: "validate_", type: matches[1] }
+    } else if (matches = matchExpr(r`_validate_(\w+)`, source)) {          // _validate_linestyle, _validate_pathlike, etc.
+        return { kind: "validate_", type: matches[1] }
+    } else if (matchExpr(r`_range_validators\["0 <= x <= 1"\]`, source)) { // _range_validators["0 <= x <= 1"]
+        return { kind: "0 <= x <= 1" }
+    } else if (matchExpr(r`_range_validators\["0 <= x < 1"\]`, source)) {  // _range_validators["0 <= x < 1"]
+        return { kind: "0 <= x < 1" }
+    } else if (matchExpr(r`JoinStyle`, source)) { // JoinStyle
+        // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L82-L82
+        return { kind: "enum", values: ["miter", "round", "bevel"] }
+    } else if (matchExpr(r`CapStyle`, source)) {
+        // https://github.com/matplotlib/matplotlib/blob/b09aad279b5colordcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L151-L151
+        return { kind: "enum", values: ["butt", "projecting", "round"] }
+    } else if (matches = matchExpr(r`(\[\s*(?:"[^"]*"|'[^']*')\s*(?:,\s*(?:"[^"]*"|'[^']*')\s*)*\])\s*`, source)) { // ["foo", "bar"]
+        try {
+            const values = json5.parse(matches[1])
+            if (Array.isArray(values) && values.every((v) => typeof v === "string")) {
+                return { kind: "enum", values }
+            } else {
+                return { kind: "untyped", type: source }
+            }
+        } catch (err) {
+            console.log(`Parse error: ${matches[1]}`)
+            return { kind: "untyped", type: source }
+        }
+    } else if (matches = matchExpr(r`_listify_validator\(([^\)]+), n=(\d+)\)`, source)) { // _listify_validator(validate_int, n=2)
+        return { kind: 'fixed_length_list', len: +matches[2], child: parseValidator(matches[1]) }
+    } else if (matches = matchExpr(r`_listify_validator\(([^\)]+)\)`, source)) { // _listify_validator(validate_int, n=2)
+        return { kind: 'list', child: parseValidator(matches[1]) }
+    } else if (matches = matchExpr(r`_ignorecase\(([^\)]+)\)`, source)) {
+        return parseValidator(matches[1])
+    } else {
+        return { kind: "untyped", type: source }
+    }
+}
+
+const parseValidators = (/** @type {string} */content) =>
+    new Map(parseDict(content, '_validators').map(({ key, value }) => [key, parseValidator(value)]))
+
+exports.parseValidators = parseValidators
+
+const parsePropValidators = (/** @type {string} */content) =>
+    new Map(parseDict(content, '_prop_validators').map(({ key, value }) => [key, parseValidator(value)]))
+
+exports.parsePropValidators = parsePropValidators
 
 const parseMatplotlibrc = (/** @type {string} */content) => {
     /** @type {Map<string, { exampleValue: string, comment: string }>} */
@@ -94,7 +124,7 @@ const parseMatplotlibrc = (/** @type {string} */content) => {
         if (/^ +#/.test(line) && last !== null) {
             const lastItem = result.get(last)
             if (lastItem !== undefined) {
-                lastItem.comment += "\n" + line.split("#", 2)[1].trimStart() 
+                lastItem.comment += "\n" + line.split("#", 2)[1].trimStart()
             }
             continue
         }
@@ -143,9 +173,13 @@ exports.readAll = (/** @type {string} */extensionPath, /** @type {unknown} */mat
         errors.push(`mplstyle: ${filepaths.length >= 2 ? "neither of " : ""}"${filepaths.map((v) => path.resolve(path.join(matplotlibDirectory, v))).join(" nor ")}" does not exist. ${useDefaultPath ? "Please reinstall the extension" : 'Please delete or modify the value of "mplstyle.matplotlibPath" in the settings'}.`)
         return ""
     }
+
+    const withPrefix = (/** @type {string} */x) => [path.join(`lib/matplotlib/`, x), x]
+    const rcsetup = readMatplotlibFile(withPrefix("rcsetup.py"))
     return {
-        signatures: parseRcsetupPy(readMatplotlibFile(["rcsetup.py"])),
-        documentation: parseMatplotlibrc(readMatplotlibFile(["lib/matplotlib/mpl-data/matplotlibrc", "mpl-data/matplotlibrc"])),
+        signatures: parseValidators(rcsetup),
+        cyclerProps: parsePropValidators(rcsetup),
+        documentation: parseMatplotlibrc(readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))),
         errors,
     }
 }

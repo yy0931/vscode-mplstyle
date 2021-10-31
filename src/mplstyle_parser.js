@@ -8,13 +8,13 @@
 
 /** https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/__init__.py#L724-L724 */
 exports.parseAll = (/** @type {string} */content) => {
-	/** @type {Map<string, { readonly pair: Pair, readonly line: number }>} */
-	const rc = new Map()
+    /** @type {Map<string, { readonly pair: Pair, readonly line: number }>} */
+    const rc = new Map()
 
     /** @type {{ error: string, severity: Severity, line: number, columnStart: number, columnEnd: number }[]} */
     const errors = []
 
-	for (const [lineNumber, line] of content.replaceAll('\r', '').split('\n').entries()) {
+    for (const [lineNumber, line] of content.replaceAll('\r', '').split('\n').entries()) {
         const pair = this.parseLine(line)
         if (pair === null) { continue }
         if (pair.value === null) {
@@ -24,7 +24,7 @@ exports.parseAll = (/** @type {string} */content) => {
             errors.push({ error: `duplicate key "${pair.key.text}"`, severity: "Error", line: lineNumber, columnStart: pair.key.start, columnEnd: pair.key.end })
         }
         rc.set(pair.key.text, { pair, line: lineNumber })
-	}
+    }
 
     return { rc, errors }
 }
