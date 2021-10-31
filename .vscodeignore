@@ -6,3 +6,4 @@ dump_color_map.py
 screenshot.png
 color_provider.png
 list_unsupported_types.js
+.nyc_output
