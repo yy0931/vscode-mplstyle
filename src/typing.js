@@ -77,7 +77,7 @@ const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */si
                     return [`${type} (any)`, (x) => true, []]
                 default:
                     // unimplemented
-                    return [`${type}`, (x) => true, []]
+                    return [`${type} (any)`, (x) => true, []]
             }
         } case "enum": {
             const values = signature.values
