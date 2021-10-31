@@ -30,10 +30,18 @@
         },
         {
             "name": "constant.numeric.mplstyle",
-            "match": "\\b[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\b"
+            "match": "(?<=[^\\w])[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\b"
         },
         {
-            "match": "((\\S+))",
+            "name": "punctuation.separator.comma.mplstyle",
+            "match": ","
+        },
+        {
+            "name": "entity.name.function.mplstyle",
+            "match": "\\b\\w+(?=\\()"
+        },
+        {
+            "match": "(([^\\s,\\[\\]()]+))",
             "captures": {
                 "1": {
                     "name": "support.constant.property-value.mplstyle"
