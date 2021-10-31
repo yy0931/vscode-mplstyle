@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+  schedule:
+    - cron: 45 9 * * 6  # At 09:45 on Saturday
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16.x
+      - run: npm ci -D
+
+      - name: Install Matplotlib from pypi
+        run: pip3 install matplotlib numpy
+      - run: npm test
+
+      - name: Install Matplotlib from GitHub
+        run: |
+          pip3 uninstall matplotlib -y
+          git clone --depth=1 -b main https://github.com/matplotlib/matplotlib matplotlib-latest
+          pip3 install ./matplotlib-latest
+      - run: npm test
+
+      - name: Check for updates of Matplotlib
+        run: |
+          ./update_matplotlib_source.sh
+          python3 dump_color_map.py
+          git diff --name-only --exit-code matplotlib color_map.json
