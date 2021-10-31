@@ -1,7 +1,7 @@
 const json5 = require("json5")
 const parseMplstyle = require("./mplstyle_parser")
 
-/** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string }} Signature */
+/** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string } | { readonly kind: "fixed_length_list", readonly len: number, child: Signature }} Signature */
 
 const parseRcsetupPy = (/** @type {string} */content) => {
     content = content
@@ -56,6 +56,8 @@ const parseRcsetupPy = (/** @type {string} */content) => {
                     console.log(`Parse error: ${matches[1]}`)
                     result.set(key, { kind: "untyped", type: value })
                 }
+            } else if (matches = /^_listify_validator\(validate_(\w+), n=(\d+)\)(?:\s|\W|,|$)/.exec(value)) { // _listify_validator(validate_int, n=2)
+                result.set(key, { kind: 'fixed_length_list', len: +matches[2], child: { kind: 'validate_', type: matches[1] } })
             } else {
                 result.set(key, { kind: "untyped", type: value })
             }

@@ -1,9 +1,8 @@
 const mplSourceParser = require("./mpl_source_parser")
 const fs = require("fs")
-const { assert: { deepStrictEqual, include } } = require("chai")
+const { assert: { deepStrictEqual, include, fail } } = require("chai")
 const path = require("path")
 const { spawnSync } = require("child_process")
-const { fail, strictEqual } = require("assert")
 
 describe("parse rcsetup.py", () => {
     const signatures = mplSourceParser.parseRcsetupPy(fs.readFileSync("./matplotlib/rcsetup.py").toString())
@@ -28,6 +27,9 @@ describe("parse rcsetup.py", () => {
     })
     it("figure.subplot.wspace", () => {
         deepStrictEqual(signatures.get("figure.subplot.wspace"), { kind: "0 <= x < 1" })
+    })
+    it("axes.formatter.limits", () => {
+        deepStrictEqual(signatures.get("axes.formatter.limits"), { kind: "fixed_length_list", len: 2, child: { kind: "validate_", type: "int" } })
     })
 })
 

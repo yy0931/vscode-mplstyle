@@ -34,6 +34,14 @@ const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */si
                     return typeof x === "number" && 0 <= x && x <= 1
                 },
             }
+        } case "fixed_length_list": {
+            const child = getTypeChecker(signature.child)
+            return {
+                label: `List[${child.label}] (len=${signature.len})`,
+                check: (x) => x.split(",").length === signature.len && x.split(",").map((v) => v.trim()).every((v) => child.check(v)),
+                constants: child.constants,
+                color: child.color,
+            }
         } case "validate_": {
             // suffixes
             // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L199
