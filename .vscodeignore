@@ -8,3 +8,4 @@ color_provider.png
 list_unsupported_types.js
 .nyc_output
 update_matplotlib_source.sh
+.github/**
