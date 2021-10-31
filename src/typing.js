@@ -9,11 +9,11 @@ const json5Parse = (/** @type {string} */text) => {
 }
 
 /**
- * @returns {{ readonly label: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly isColor: boolean }}
+ * @returns {{ readonly label: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }}
  */
 const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */signature) => {
-    /** @type {{ readonly constants: readonly string[], readonly isColor: boolean }} */
-    const defaults = { constants: [], isColor: false }
+    /** @type {{ readonly constants: readonly string[], readonly color: boolean }} */
+    const defaults = { constants: [], color: false }
 
     switch (signature.kind) {
         case "0 <= x < 1": {
@@ -44,7 +44,7 @@ const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */si
                     label: `"none" | ${child.label}`,
                     check: (x) => child.check(x) || x.toLowerCase() == "none",
                     constants: [...child.constants ?? [], "none"],
-                    isColor: child.isColor,
+                    color: child.color,
                 }
             }
             if (type.endsWith("list")) {
@@ -54,7 +54,7 @@ const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */si
                     label: `List[${child.label}]`,
                     check: (x) => x.split(",").map((v) => v.trim()).every((v) => child.check(v)),
                     constants: child.constants,
-                    isColor: child.isColor,
+                    color: child.color,
                 }
             }
 
@@ -98,9 +98,9 @@ const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */si
                 case "fonttype": // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L224-L224
                     return { ...defaults, label: `${type} (any)`, check: (x) => true }
                 case "color":
-                    return { ...defaults, label: `color`, check: (x) => true, isColor: true }
+                    return { ...defaults, label: `color`, check: (x) => true, color: true }
                 case "color_or_auto":
-                    return { label: `color | "auto"`, check: (x) => true, constants: ["auto"], isColor: true }
+                    return { ...defaults, label: `color | "auto"`, check: (x) => true, constants: ["auto"], color: true }
                 default:
                     // unimplemented
                     return { ...defaults, label: `${type} (any)`, check: (x) => true }
