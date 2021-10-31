@@ -85,6 +85,13 @@ const toRGBA = (/** @type {string} */value, /** @type {Map<string, readonly [num
     return null
 }
 
+const toHex = (/** @type {readonly [number, number, number, number]} */color) => {
+    return ("00" + Math.floor(color[0] * 255).toString(16).toUpperCase()).slice(-2) +
+        ("00" + Math.floor(color[1] * 255).toString(16).toUpperCase()).slice(-2) +
+        ("00" + Math.floor(color[2] * 255).toString(16).toUpperCase()).slice(-2) +
+        (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
+}
+
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     let { documentation, signatures } = loadDocs(context.extensionPath)
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
@@ -101,8 +108,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             const signature = signatures.get(pair.key.text)
             if (signature === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
             const typeChecker = getType(signature)
-            if (typeChecker[1](pair.value.text) === false) {
-                return [{ error: `${pair.value.text} is not assignable to ${typeChecker[0]}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
+            if (typeChecker.check(pair.value.text) === false) {
+                return [{ error: `${pair.value.text} is not assignable to ${typeChecker.label}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
             }
             return []
         }))
@@ -143,7 +150,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         if (signature === undefined) { return }
                         return new vscode.Hover(
                             new vscode.MarkdownString()
-                                .appendCodeblock(`${line.key.text}: ${getType(signature)[0]}`, "python")
+                                .appendCodeblock(`${line.key.text}: ${getType(signature).label}`, "python")
                                 .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n#### Example")
                                 .appendCodeblock(`${line.key.text}: ${documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
                             new vscode.Range(position.line, line.key.start, position.line, line.key.end),
@@ -166,12 +173,21 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         if (line === null) { return }
                         const signature = signatures.get(line.key.text)
                         if (signature === undefined) { return }
-                        return getType(signature)[2].map((v) => new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant))
+                        const type = getType(signature)
+                        const items = type.constants.map((v) => new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant))
+                        if (type.isColor) {
+                            items.push(...Array.from(colorMap.entries()).map(([k, v]) => {
+                                const item = new vscode.CompletionItem(k, vscode.CompletionItemKind.Color)
+                                item.detail = "#" + toHex(v)
+                                return item
+                            }))
+                        }
+                        return items
                     } else {
                         // Key
                         return Array.from(signatures.entries()).map(([key, value]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                            item.detail = `${key}: ${getType(value)[0]}`
+                            item.detail = `${key}: ${getType(value).label}`
                             item.documentation = new vscode.MarkdownString()
                                 .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
                                 .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
@@ -193,7 +209,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     for (const { pair, line } of parseMplstyle.parseAll(document.getText()).rc.values()) {
                         const signature = signatures.get(pair.key.text)
                         if (signature === undefined || !("type" in signature) || pair.value === null) { continue }
-                        if (signature.type.includes("color")) { // color or color_or_auto
+                        if (getType(signature).isColor) {
                             const color = toRGBA(pair.value.text, colorMap)
                             if (color !== null) {
                                 result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), color))
@@ -221,12 +237,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 }
             },
             provideColorPresentations(color, ctx) {
-                return [new vscode.ColorPresentation(
-                    ("00" + Math.floor(color.red * 255).toString(16).toUpperCase()).slice(-2) +
-                    ("00" + Math.floor(color.green * 255).toString(16).toUpperCase()).slice(-2) +
-                    ("00" + Math.floor(color.blue * 255).toString(16).toUpperCase()).slice(-2) +
-                    (color.alpha === 1 ? "" : ("00" + Math.floor(color.alpha * 255).toString(16).toUpperCase()).slice(-2)),
-                )]
+                return [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))]
             }
         })
     )
