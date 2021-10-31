@@ -1,45 +1,16 @@
 const fs = require("fs")
 const vscode = require("vscode")
 const path = require("path")
-const parseMplSource = require("./mpl_source_parser")
-const parseMplstyle = require("./mplstyle_parser")
+const mplSourceParser = require("./mpl_source_parser")
+const mplstyleParser = require("./mplstyle_parser")
 const getType = require('./typing')
 const json5 = require('json5')
-const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
 
 const json5Parse = (/** @type {string} */text) => {
     try {
         return json5.parse(text)
     } catch (err) {
         return err
-    }
-}
-
-const loadDocs = (/** @type {string} */extensionPath) => {
-    // Read and parse matplotlib/rcsetup.py
-    const matplotlibPathConfig = /** @type {unknown} */(vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
-    const useDefaultPath = matplotlibPathConfig === undefined || typeof matplotlibPathConfig !== "string" || matplotlibPathConfig === ""
-    const matplotlibDirectory = useDefaultPath ? path.join(extensionPath, "matplotlib") : matplotlibPathConfig
-
-    /** @returns {string} */
-    const readMatplotlibFile = (/** @type {string[]} */filepaths) => {
-        for (const filepath of filepaths) {
-            try {
-                return fs.readFileSync(path.join(matplotlibDirectory, filepath)).toString()
-            } catch (err) {
-                if (isNOENT(err)) {
-                    continue
-                }
-                vscode.window.showErrorMessage(`mplstyle: ${err}.`)
-                throw err
-            }
-        }
-        vscode.window.showErrorMessage(`mplstyle: ${filepaths.length >= 2 ? "neither of " : ""}"${filepaths.map((v) => path.resolve(path.join(matplotlibDirectory, v))).join(" nor ")}" does not exist. ${useDefaultPath ? "Please reinstall the extension" : 'Please delete or modify the value of "mplstyle.matplotlibPath" in the settings'}.`)
-        return ""
-    }
-    return {
-        signatures: parseMplSource.rcsetupPy(readMatplotlibFile(["rcsetup.py"])),
-        documentation: parseMplSource.matplotlibrc(readMatplotlibFile(["lib/matplotlib/mpl-data/matplotlibrc", "mpl-data/matplotlibrc"])),
     }
 }
 
@@ -93,7 +64,11 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
 }
 
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
-    let { documentation, signatures } = loadDocs(context.extensionPath)
+    let { documentation, signatures, errors } = mplSourceParser.readAll(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+    for (const err of errors) {
+        vscode.window.showErrorMessage(`mplstyle: ${err}.`)
+    }
+    
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
     const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
@@ -102,7 +77,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         if (editor?.document.languageId !== "mplstyle") {
             return
         }
-        const { rc, errors } = parseMplstyle.parseAll(editor.document.getText())
+        const { rc, errors } = mplstyleParser.parseAll(editor.document.getText())
         errors.push(...Array.from(rc.values()).flatMap(/** @returns {{ error: string, severity: import("./mplstyle_parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
             if (pair.value === null) { return [] }  // missing semicolon
             const signature = signatures.get(pair.key.text)
@@ -133,8 +108,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
         vscode.workspace.onDidChangeConfiguration((ev) => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
-                const out = loadDocs(context.extensionPath)
-                documentation = out.documentation
+                const out = mplSourceParser.readAll(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+                for (const err of out.errors) {
+                    vscode.window.showErrorMessage(`mplstyle: ${err}.`)
+                }
+                            documentation = out.documentation
                 signatures = out.signatures
             }
         }),
@@ -142,7 +120,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         vscode.languages.registerHoverProvider({ language: "mplstyle" }, {
             provideHover(document, position) {
                 try {
-                    const line = parseMplstyle.parseLine(document.lineAt(position.line).text)
+                    const line = mplstyleParser.parseLine(document.lineAt(position.line).text)
                     if (line === null) { return }
 
                     if (line.key.start <= position.character && position.character < line.key.end) {
@@ -182,7 +160,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     const textLine = document.lineAt(position.line)
                     if (textLine.text.slice(0, position.character).includes(":")) {
                         // Value
-                        const line = parseMplstyle.parseLine(textLine.text)
+                        const line = mplstyleParser.parseLine(textLine.text)
                         if (line === null || line.value === null) { return }
                         const signature = signatures.get(line.key.text)
                         if (signature === undefined) { return }
@@ -246,7 +224,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 try {
                     /** @type {vscode.ColorInformation[]} */
                     const result = []
-                    for (const { pair, line } of parseMplstyle.parseAll(document.getText()).rc.values()) {
+                    for (const { pair, line } of mplstyleParser.parseAll(document.getText()).rc.values()) {
                         const signature = signatures.get(pair.key.text)
                         if (signature === undefined || pair.value === null) { continue }
                         if (getType(signature).color) {
@@ -284,7 +262,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             provideSignatureHelp(document, position) {
                 try {
                     const textLine = document.lineAt(position.line)
-                    const pair = parseMplstyle.parseLine(textLine.text)
+                    const pair = mplstyleParser.parseLine(textLine.text)
                     if (pair === null || pair.value === null) { return }
                     const left = textLine.text.slice(pair.value.start)
                     if (/^\s*cycler\b/.test(left)) {

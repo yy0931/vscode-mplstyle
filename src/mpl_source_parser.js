@@ -3,7 +3,7 @@ const parseMplstyle = require("./mplstyle_parser")
 
 /** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string }} Signature */
 
-exports.rcsetupPy = (/** @type {string} */content) => {
+const parseRcsetupPy = (/** @type {string} */content) => {
     content = content
         .replace(/\r/g, "")
         .replace(/^(.|\n)*\n_validators = \{\n/, "") // remove the code before `_validators = {`
@@ -67,7 +67,9 @@ exports.rcsetupPy = (/** @type {string} */content) => {
     return result
 }
 
-exports.matplotlibrc = (/** @type {string} */content) => {
+exports.parseRcsetupPy = parseRcsetupPy
+
+const parseMatplotlibrc = (/** @type {string} */content) => {
     /** @type {Map<string, { exampleValue: string, comment: string }>} */
     const result = new Map()
     /** @type {string | null} */
@@ -99,4 +101,43 @@ exports.matplotlibrc = (/** @type {string} */content) => {
         last = pair.key.text
     }
     return result
+}
+
+exports.parseMatplotlibrc = parseMatplotlibrc
+
+const path = require("path")
+const fs = require("fs")
+const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
+
+exports.readAll = (/** @type {string} */extensionPath, /** @type {unknown} */matplotlibPath) => {
+    // Read and parse matplotlib/rcsetup.py
+    const useDefaultPath = matplotlibPath === undefined || typeof matplotlibPath !== "string" || matplotlibPath === ""
+    const matplotlibDirectory = useDefaultPath ? path.join(extensionPath, "matplotlib") : matplotlibPath
+
+    /** @type {string[]} */
+    const errors = []
+
+    /** @returns {string} */
+    const readMatplotlibFile = (/** @type {string[]} */filepaths) => {
+        for (const filepath of filepaths) {
+            try {
+                return fs.readFileSync(path.join(matplotlibDirectory, filepath)).toString()
+            } catch (err) {
+                if (isNOENT(err)) {
+                    continue
+                }
+                console.error(filepath)
+                console.error(err)
+                errors.push(`${err}`)
+                return ""
+            }
+        }
+        errors.push(`mplstyle: ${filepaths.length >= 2 ? "neither of " : ""}"${filepaths.map((v) => path.resolve(path.join(matplotlibDirectory, v))).join(" nor ")}" does not exist. ${useDefaultPath ? "Please reinstall the extension" : 'Please delete or modify the value of "mplstyle.matplotlibPath" in the settings'}.`)
+        return ""
+    }
+    return {
+        signatures: parseRcsetupPy(readMatplotlibFile(["rcsetup.py"])),
+        documentation: parseMatplotlibrc(readMatplotlibFile(["lib/matplotlib/mpl-data/matplotlibrc", "mpl-data/matplotlibrc"])),
+        errors,
+    }
 }

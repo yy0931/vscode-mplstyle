@@ -11,3 +11,4 @@ log.txt
 dist/
 example/**
 /src/docs.js
+.nyc_output

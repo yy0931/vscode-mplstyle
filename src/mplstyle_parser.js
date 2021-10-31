@@ -21,7 +21,7 @@ exports.parseAll = (/** @type {string} */content) => {
             errors.push({ error: "Missing colon", severity: "Error", line: lineNumber, columnStart: 0, columnEnd: line.length })
         }
         if (rc.has(pair.key.text)) {
-            errors.push({ error: `duplicate key ${pair.key.text}`, severity: "Error", line: lineNumber, columnStart: pair.key.start, columnEnd: pair.key.end })
+            errors.push({ error: `duplicate key "${pair.key.text}"`, severity: "Error", line: lineNumber, columnStart: pair.key.start, columnEnd: pair.key.end })
         }
         rc.set(pair.key.text, { pair, line: lineNumber })
 	}

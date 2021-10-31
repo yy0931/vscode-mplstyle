@@ -52,7 +52,7 @@ const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */si
                 const child = getTypeChecker({ kind: "validate_", type: type.slice(0, -"list".length) })
                 return {
                     label: `List[${child.label}]`,
-                    check: (x) => x.split(",").map((v) => v.trim()).every((v) => child.check(v)),
+                    check: (x) => x.trim() === "" || x.split(",").map((v) => v.trim()).every((v) => child.check(v)),
                     constants: child.constants,
                     color: child.color,
                 }
