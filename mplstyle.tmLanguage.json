@@ -33,8 +33,15 @@
             "match": "\\b[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\b"
         },
         {
-            "name": "string.unquoted.plain.out.mplstyle",
-            "match": "\\S+"
+            "match": "((\\S+))",
+            "captures": {
+                "1": {
+                    "name": "support.constant.property-value.mplstyle"
+                },
+                "2": {
+                    "name": "meta.property-value.mplstyle"
+                }
+            }
         }
     ]
 }
