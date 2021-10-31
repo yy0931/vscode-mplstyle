@@ -201,7 +201,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         } else if (signature.type === "cycler") {
                             /** @type {RegExpExecArray | null} */
                             let matches = null
-                            const pattern = /'(?:\w|\d|-)*'|"(?:\w|\d|-)*"/gi
+                            // '0.40', 'E24A33', etc.
+                            const pattern = /'(?:\w|\d|-|[.])*'|"(?:\w|\d|-|[.])*"/gi
                             while ((matches = pattern.exec(pair.value.text)) !== null) {
                                 const color = toRGBA(pair.value.text.slice(matches.index + 1, matches.index + matches[0].length - 1), colorMap)
                                 if (color !== null) {
