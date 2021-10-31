@@ -187,7 +187,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         const signature = signatures.get(line.key.text)
                         if (signature === undefined) { return }
                         const type = getType(signature)
-                        const items = type.constants.map((v) => new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant))
+                        const items = type.constants.map((v) => {
+                            const item = new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant)
+                            item.detail = "constant"
+                            return item
+                        })
                         const colors = (/** @type {string} */quotation) => Array.from(colorMap.entries()).map(([k, v]) => {
                             const item = new vscode.CompletionItem(quotation + k + quotation, vscode.CompletionItemKind.Color)
                             item.detail = "#" + toHex(v)
@@ -211,7 +215,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         // Key
                         return Array.from(signatures.entries()).map(([key, value]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                            item.detail = `${key}: ${getType(value).label}`
+                            const type = getType(value)
+                            item.detail = `${key}: ${type.label}`
                             item.documentation = new vscode.MarkdownString()
                                 .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
                                 .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
@@ -220,7 +225,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                                 // Replace the entire line
                                 item.range = textLine.range
                                 item.insertText = new vscode.SnippetString(`${key}: \${1}`)
-                                item.command = { title: "Trigger Suggest", command: "editor.action.triggerSuggest" }
+                                if (type.color || type.constants.length > 0 || ("type" in value && value.type === "cycler")) {
+                                    item.command = { title: "Trigger Suggest", command: "editor.action.triggerSuggest" }
+                                }
                             } else {
                                 // Replace the key
                                 item.range = new vscode.Range(position.line, 0, position.line, colon)
