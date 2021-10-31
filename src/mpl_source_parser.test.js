@@ -68,6 +68,7 @@ describe("read all", () => {
         const matches = /Location: (.*)$/m.exec(stdout.toString())
         if (matches === null) {
             fail(stdout.toString())
+            return
         }
         try {
             const { documentation, signatures, errors } = mplSourceParser.readAll('err', path.join(matches[1], "matplotlib"))

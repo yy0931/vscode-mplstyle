@@ -43,7 +43,7 @@ describe('typing', () => {
             deepStrictEqual(getType({ kind: "0 <= x <= 1" }).label, `float (0 <= x <= 1)`)
         })
         it("floatlist", () => {
-            deepStrictEqual(getType({ kind: "validate_", type: "floatlist" }).label, `List[float]`)
+            deepStrictEqual(getType({ kind: "validate_", type: "floatlist" }).label, `list[float]`)
         })
         it("unknown", () => {
             deepStrictEqual(getType({ kind: "validate_", type: "undefinedtype" }).label, `undefinedtype (any)`)
@@ -52,7 +52,7 @@ describe('typing', () => {
             deepStrictEqual(getType({ kind: "untyped", type: "foo" }).label, `foo (any)`)
         })
         it("fixed length list", () => {
-            deepStrictEqual(getType({ kind: "fixed_length_list", len: 3, child: { kind: "validate_", type: "int" } }).label, `List[int] (len=3)`)
+            deepStrictEqual(getType({ kind: "fixed_length_list", len: 3, child: { kind: "validate_", type: "int" } }).label, `list[int] (len=3)`)
         })
     })
 })

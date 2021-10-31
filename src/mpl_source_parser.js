@@ -44,6 +44,12 @@ const parseRcsetupPy = (/** @type {string} */content) => {
                 result.set(key, { kind: "0 <= x <= 1" })
             } else if (/^_range_validators\["0 <= x < 1"\](?:\s|\W|,|$)/.test(value)) {  // _range_validators["0 <= x < 1"]
                 result.set(key, { kind: "0 <= x < 1" })
+            } else if (/^JoinStyle(?:\s|\W|,|$)/.test(value)) { // JoinStyle
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L82-L82
+                result.set(key, { kind: "enum", values: ["miter", "round", "bevel"] })
+            } else if (/^CapStyle(?:\s|\W|,|$)/.test(value)) {
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L151-L151
+                result.set(key, { kind: "enum", values: ["butt", "projecting", "round"] })
             } else if (matches = /^(\[\s*(?:"[^"]*"|'[^']*')\s*(?:,\s*(?:"[^"]*"|'[^']*')\s*)*\])\s*(?:\s|\W|,|$)/.exec(value)) { // ["foo", "bar"]
                 try {
                     const values = json5.parse(matches[1])

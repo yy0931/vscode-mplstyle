@@ -140,7 +140,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         if (matches !== null && line.value.start + matches.index <= position.character && position.character < line.value.start + matches.index + 'cycler'.length) {
                             return new vscode.Hover(
                                 new vscode.MarkdownString()
-                                    .appendCodeblock(`cycler('color', values: List[str])\ncycler(*, color: List[str])`, 'python')
+                                    .appendCodeblock(`cycler('color', values: list[str])\ncycler(*, color: list[str])`, 'python')
                                     .appendMarkdown("---\n")
                                     .appendMarkdown("Creates a \`cycler.Cycler\` which cycles over one or more colors simultaneously."),
                                 new vscode.Range(position.line, line.value.start + matches.index, position.line, line.value.start + matches.index + 'cycler'.length),
@@ -267,10 +267,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     const left = textLine.text.slice(pair.value.start)
                     if (/^\s*cycler\b/.test(left)) {
                         // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L618-L618
-                        const form2 = new vscode.SignatureInformation("cycler('color', values: List[str])")
-                        form2.parameters = [new vscode.ParameterInformation(`'color'`), new vscode.ParameterInformation(`values: List[str]`)]
-                        const form3 = new vscode.SignatureInformation("cycler(*, color: List[str])")
-                        form3.parameters = [new vscode.ParameterInformation('color: List[str]')]
+                        // TODO: axes.prop_cycle: cycler(color=["red", "blue"], linestyle=["-", "--"])
+                        const form2 = new vscode.SignatureInformation("cycler('color', values: list[str])")
+                        form2.parameters = [new vscode.ParameterInformation(`'color'`), new vscode.ParameterInformation(`values: list[str]`)]
+                        const form3 = new vscode.SignatureInformation("cycler(*, color: list[str])")
+                        form3.parameters = [new vscode.ParameterInformation('color: list[str]')]
 
                         form2.documentation = form3.documentation = `Creates a \`cycler.Cycler\` which cycles over one or more colors simultaneously.`
 

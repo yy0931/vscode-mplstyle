@@ -2,7 +2,7 @@
 **/*.test.js
 .gitignore
 **/jsconfig.json
-type_checker_coverage.js
 dump_color_map.py
 screenshot.png
 color_provider.png
+list_unsupported_types.js
