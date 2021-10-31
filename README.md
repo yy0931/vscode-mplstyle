@@ -12,8 +12,8 @@ Intellisense for .mplstyle and matplotlibrc files.
 
 ## Features
 - [x] Syntax highlighting
-- [x] Autocomplete
-- [x] Documentation on Hover
+- [x] Auto-completion
+- [x] Hover provider
 - [x] Type checking
-- [x] Color Picker
+- [x] Color picker
 
