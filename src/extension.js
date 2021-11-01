@@ -135,7 +135,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         return new vscode.Hover(
                             new vscode.MarkdownString()
                                 .appendCodeblock(`${line.key.text}: ${getType(signature).label}`, "python")
-                                .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n#### Example")
+                                .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n---\n#### Example")
                                 .appendCodeblock(`${line.key.text}: ${documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
                             new vscode.Range(position.line, line.key.start, position.line, line.key.end),
                         )
@@ -143,7 +143,6 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         // Value
                         const matches = /^\s*cycler\b/.exec(line.value.text)
                         if (matches !== null && line.value.start + matches.index <= position.character && position.character < line.value.start + matches.index + 'cycler'.length) {
-                            const labelTypes = Array.from(cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")
                             return new vscode.Hover(
                                 new vscode.MarkdownString()
                                     .appendCodeblock(`cycler(*, ${cycler.kwargs.join(", ")})\ncycler(label: ${cycler.label}, values: list)`, 'python')
@@ -202,7 +201,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             const type = getType(value)
                             item.detail = `${key}: ${type.label}`
                             item.documentation = new vscode.MarkdownString()
-                                .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n#### Example")
+                                .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n---\n#### Example")
                                 .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
                             const colon = textLine.text.indexOf(":")
                             if (colon === -1) {

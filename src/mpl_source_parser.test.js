@@ -1,6 +1,6 @@
 const mplSourceParser = require("./mpl_source_parser")
 const fs = require("fs")
-const { assert: { deepStrictEqual, include, fail } } = require("chai")
+const { assert: { deepStrictEqual, include, fail, strictEqual } } = require("chai")
 const path = require("path")
 const { spawnSync } = require("child_process")
 
@@ -91,22 +91,72 @@ it("parse _prop_validators", () => {
     deepStrictEqual(props.get('linewidth'), { kind: "validate_", type: "floatlist" })
 })
 
-describe("parse matplotlibrc", () => {
+describe("parseMatplotlibrc", () => {
     it("multi-line comments", () => {
-        deepStrictEqual(mplSourceParser.parseMatplotlibrc(`\
-# a
-key1: value1 # key1-comment1
-             # key1-comment2
-# b
-key2: value2 # key2-comment1
-`), new Map([
+        deepStrictEqual(Array.from(mplSourceParser.parseMatplotlibrc(`\
+#key1: value1 # key1-comment1
+              # key1-comment2
+#key2: value2 # key2-comment1
+`).entries()), [
             ['key1', { exampleValue: 'value1', comment: 'key1-comment1\nkey1-comment2' }],
             ['key2', { exampleValue: 'value2', comment: 'key2-comment1' }],
-        ]))
+        ])
     })
-    it("axes.axisbelow", () => {
-        const documentation = mplSourceParser.parseMatplotlibrc(fs.readFileSync("./matplotlib/lib/matplotlib/mpl-data/matplotlibrc").toString())
-        deepStrictEqual(documentation.get("axes.axisbelow"), { exampleValue: "line", comment: `draw axis gridlines and ticks:\n- below patches (True)\n- above patches but below lines ('line')\n- above all (False)` })
+    it("subheadings", () => {
+        deepStrictEqual(Array.from(mplSourceParser.parseMatplotlibrc(`\
+## a
+#key1: value1
+#key2: value2
+
+## b
+#key3: value3
+#key4: value4
+`).entries()), [
+            ['key1', { exampleValue: 'value1', comment: 'a\n\n- key1\n- key2' }],
+            ['key2', { exampleValue: 'value2', comment: 'a\n\n- key1\n- key2' }],
+            ['key3', { exampleValue: 'value3', comment: 'b\n\n- key3\n- key4' }],
+            ['key4', { exampleValue: 'value4', comment: 'b\n\n- key3\n- key4' }],
+        ])
+    })
+    it("Complex comments 1", () => {
+        const entries = mplSourceParser.parseMatplotlibrc(`
+## ***************************************************************************
+## * SECTION                                                                 *
+## ***************************************************************************
+## section body
+
+## subheading1
+## subheading2
+##key1: value1  # comment1
+               # comment2
+#key2: value2
+`)
+        deepStrictEqual(entries.get("key1"), { exampleValue: "value1", comment: `\
+comment1
+comment2
+
+---
+subheading1
+subheading2
+
+- key1
+- key2
+
+---
+### SECTION
+section body
+` })
+    })
+    it("Complex comments 2", () => {
+        const entries = mplSourceParser.parseMatplotlibrc(`
+## ***************************************************************************
+## * SECTION                                                                 *
+## ***************************************************************************
+#key1: value1
+## subheading2
+#key2: value2
+`)
+        deepStrictEqual(entries.get("key1"), { exampleValue: "value1", comment: `` })
     })
 })
 
@@ -115,8 +165,9 @@ describe("read all", () => {
         const { documentation, signatures, errors } = mplSourceParser.readAll(path.join(__dirname, ".."), undefined)
 
         deepStrictEqual(errors, [])
+        include(documentation.get("backend")?.exampleValue, "Agg")
         include(documentation.get("figure.subplot.right")?.comment, 'the right side of the subplots of the figure')
-        deepStrictEqual(signatures.has('font.family'), true)
+        strictEqual(signatures.has('font.family'), true)
     })
     it("custom path", function () {
         this.timeout(20 * 1000)
@@ -133,7 +184,7 @@ describe("read all", () => {
             const { documentation, signatures, errors } = mplSourceParser.readAll('err', path.join(matches[1], "matplotlib"))
             deepStrictEqual(errors, [])
             include(documentation.get("figure.subplot.right")?.comment, 'the right side of the subplots of the figure')
-            deepStrictEqual(signatures.has('font.family'), true)
+            strictEqual(signatures.has('font.family'), true)
         } catch (err) {
             console.log(`stdout: ${stdout.toString()}`)
             console.log(`stderr: ${stderr.toString()}`)
