@@ -11,4 +11,4 @@ def json_dump_compact(obj: Any):
     return json.dumps(json.loads(json.dumps(obj), parse_float=lambda x: round(float(x), 3)), separators=(',', ':'))
 
 
-Path("./color_map.json").write_text(json_dump_compact({k: [x for x in matplotlib.colors.to_rgba(v)] for k, v in matplotlib.colors.get_named_colors_mapping().items()}))
+(Path(__file__).parent.parent / "color_map.json").write_text(json_dump_compact({k: [x for x in matplotlib.colors.to_rgba(v)] for k, v in matplotlib.colors.get_named_colors_mapping().items()}))

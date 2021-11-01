@@ -128,9 +128,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         // Key
                         const type = mpl.params.get(line.key.text)
                         if (type === undefined) { return }
+                        const md = new vscode.MarkdownString().appendCodeblock(`${line.key.text}: ${type.label}`, "python")
+                        const imagePath = path.join(context.extensionPath, 'example', line.key.text + ".png")
+                        if (fs.existsSync(imagePath)) {
+                            md.appendMarkdown(`![image](${vscode.Uri.file(imagePath).toString()}|height=150)\n\n`)
+                        }
                         return new vscode.Hover(
-                            new vscode.MarkdownString()
-                                .appendCodeblock(`${line.key.text}: ${type.label}`, "python")
+                            md
                                 .appendMarkdown("---\n" + (mpl.documentation.get(line.key.text)?.comment ?? "") + "\n\n---\n#### Example")
                                 .appendCodeblock(`${line.key.text}: ${mpl.documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
                             new vscode.Range(position.line, line.key.start, position.line, line.key.end),
@@ -194,7 +198,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         return Array.from(mpl.params.entries()).map(([key, type]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
                             item.detail = `${key}: ${type.label}`
-                            item.documentation = new vscode.MarkdownString()
+                            const md = new vscode.MarkdownString()
+                            const imagePath = path.join(context.extensionPath, 'example', key + ".png")
+                            if (fs.existsSync(imagePath)) {
+                                md.appendMarkdown(`![image](${vscode.Uri.file(imagePath).toString()}|height=150)\n\n`)
+                            }
+                            item.documentation = md
                                 .appendMarkdown((mpl.documentation.get(key)?.comment ?? "") + "\n\n---\n#### Example")
                                 .appendCodeblock(`${key}: ${mpl.documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
                             const colon = textLine.text.indexOf(":")

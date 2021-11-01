@@ -1,0 +1,4 @@
+figure.autolayout: True
+axes.prop_cycle: cycler(color=['green', 'yellow'])
+figure.figsize: 6, 2
+figure.facecolor: none

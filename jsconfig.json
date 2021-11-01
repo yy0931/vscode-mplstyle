@@ -5,5 +5,5 @@
 		"checkJs": true,
 		"strict": true
 	},
-	"include": ["src", "test"]
+	"include": ["src", "scripts"]
 }
