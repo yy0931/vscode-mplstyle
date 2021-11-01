@@ -63,8 +63,8 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
 }
 
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
-    let { documentation, signatures, cyclerProps, errors } = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
-    for (const err of errors) {
+    let mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+    for (const err of mpl.errors) {
         vscode.window.showErrorMessage(`mplstyle: ${err}.`)
     }
 
@@ -79,7 +79,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         const { rc, errors } = mplstyleParser.parseAll(editor.document.getText())
         errors.push(...Array.from(rc.values()).flatMap(/** @returns {{ error: string, severity: import("./mplstyle_parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
             if (pair.value === null) { return [] }  // missing semicolon
-            const type = signatures.get(pair.key.text)
+            const type = mpl.params.get(pair.key.text)
             if (type === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
             if (type.check(pair.value.text) === false) {
                 return [{ error: `${pair.value.text} is not assignable to ${type.label}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
@@ -96,8 +96,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }
 
     const cycler = {
-        kwargs: Array.from(cyclerProps.entries()).map(([k, v]) => `${k}: ${v.shortLabel}`),
-        label: `label: ${Array.from(cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
+        kwargs: Array.from(mpl.cyclerProps.entries()).map(([k, v]) => `${k}: ${v.shortLabel}`),
+        label: `label: ${Array.from(mpl.cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
     }
 
     context.subscriptions.push(
@@ -111,12 +111,10 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
         vscode.workspace.onDidChangeConfiguration((ev) => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
-                const out = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
-                for (const err of out.errors) {
+                mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+                for (const err of mpl.errors) {
                     vscode.window.showErrorMessage(`mplstyle: ${err}.`)
                 }
-                documentation = out.documentation
-                signatures = out.signatures
             }
         }),
 
@@ -128,13 +126,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
                     if (line.key.start <= position.character && position.character < line.key.end) {
                         // Key
-                        const type = signatures.get(line.key.text)
+                        const type = mpl.params.get(line.key.text)
                         if (type === undefined) { return }
                         return new vscode.Hover(
                             new vscode.MarkdownString()
                                 .appendCodeblock(`${line.key.text}: ${type.label}`, "python")
-                                .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n---\n#### Example")
-                                .appendCodeblock(`${line.key.text}: ${documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
+                                .appendMarkdown("---\n" + (mpl.documentation.get(line.key.text)?.comment ?? "") + "\n\n---\n#### Example")
+                                .appendCodeblock(`${line.key.text}: ${mpl.documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
                             new vscode.Range(position.line, line.key.start, position.line, line.key.end),
                         )
                     } else if (line.value !== null && line.value.start <= position.character && position.character < line.value.end) {
@@ -165,7 +163,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         // Value
                         const line = mplstyleParser.parseLine(textLine.text)
                         if (line === null || line.value === null) { return }
-                        const type = signatures.get(line.key.text)
+                        const type = mpl.params.get(line.key.text)
                         if (type === undefined) { return }
                         const items = type.constants.map((v) => {
                             const item = new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant)
@@ -193,12 +191,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         return items
                     } else {
                         // Key
-                        return Array.from(signatures.entries()).map(([key, type]) => {
+                        return Array.from(mpl.params.entries()).map(([key, type]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
                             item.detail = `${key}: ${type.label}`
                             item.documentation = new vscode.MarkdownString()
-                                .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n---\n#### Example")
-                                .appendCodeblock(`${key}: ${documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
+                                .appendMarkdown((mpl.documentation.get(key)?.comment ?? "") + "\n\n---\n#### Example")
+                                .appendCodeblock(`${key}: ${mpl.documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
                             const colon = textLine.text.indexOf(":")
                             if (colon === -1) {
                                 // Replace the entire line
@@ -226,7 +224,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     /** @type {vscode.ColorInformation[]} */
                     const result = []
                     for (const { pair, line } of mplstyleParser.parseAll(document.getText()).rc.values()) {
-                        const type = signatures.get(pair.key.text)
+                        const type = mpl.params.get(pair.key.text)
                         if (type === undefined || pair.value === null) { continue }
                         if (type.color) {
                             const color = toRGBA(pair.value.text, colorMap)
@@ -267,7 +265,6 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     if (pair === null || pair.value === null) { return }
                     if (/^\s*cycler\b/.test(pair.value.text)) {
                         // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L618-L618
-                        // TODO: axes.prop_cycle: cycler(color=["red", "blue"], linestyle=["-", "--"])
                         const form2 = new vscode.SignatureInformation(`cycler(${cycler.label}, values: list[str])`)
                         form2.parameters = [new vscode.ParameterInformation(cycler.label), new vscode.ParameterInformation(`values: list[str]`)]
                         const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.kwargs.join(", ")})`)
@@ -292,7 +289,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                                 last = matches[1]
                             }
                             if (last !== null) {
-                                const index = Array.from(cyclerProps.keys()).indexOf(last)
+                                const index = Array.from(mpl.cyclerProps.keys()).indexOf(last)
                                 if (index === -1) { return h }
                                 h.activeParameter = index
                             }

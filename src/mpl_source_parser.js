@@ -604,7 +604,7 @@ section body
     })
 }
 
-const readAll = (/** @type {string} */extensionPath, /** @type {unknown} */matplotlibPath) => {
+const parseMplSource = (/** @type {string} */extensionPath, /** @type {unknown} */matplotlibPath) => {
     // Read and parse matplotlib/rcsetup.py
     const useDefaultPath = matplotlibPath === undefined || typeof matplotlibPath !== "string" || matplotlibPath === ""
     const matplotlibDirectory = useDefaultPath ? path.join(extensionPath, "matplotlib") : matplotlibPath
@@ -639,23 +639,23 @@ const readAll = (/** @type {string} */extensionPath, /** @type {unknown} */matpl
     const propValidators = parseDict(rcsetup, '_prop_validators')
     errors.push(...propValidators[1].map((v) => `Error during parsing rcsetup.py: ${v}`))
     return {
-        signatures: new Map(validators[0].map(({ key, value }) => [key, parseValidator(value)])),
+        params: new Map(validators[0].map(({ key, value }) => [key, parseValidator(value)])),
         cyclerProps: new Map(propValidators[0].map(({ key, value }) => [key, parseValidator(value)])),
         documentation: parseMatplotlibrc(readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))),
         errors,
     }
 }
-module.exports = readAll
+module.exports = parseMplSource
 
 if (testing) {
     const { assert: { deepStrictEqual, include, strictEqual, fail } } = require("chai")
     const { spawnSync } = require("child_process")
 
-    describe("readAll", () => {
-        /** @type {ReturnType<typeof readAll>} */
+    describe("parseMplSource", () => {
+        /** @type {ReturnType<typeof parseMplSource>} */
         let data
         before(() => {
-            data = readAll(path.join(__dirname, ".."), undefined)
+            data = parseMplSource(path.join(__dirname, ".."), undefined)
         })
 
         it("no errors", () => {
@@ -668,10 +668,10 @@ if (testing) {
             include(data.documentation.get("figure.subplot.right")?.comment, 'the right side of the subplots of the figure')
         })
         it("font.family", () => {
-            strictEqual(data.signatures.has('font.family'), true)
+            strictEqual(data.params.has('font.family'), true)
         })
         it("legend.fontsize", () => {
-            strictEqual(data.signatures.get('legend.fontsize')?.label, `"xx-small" | "x-small" | "small" | "medium" | "large" | "x-large" | "xx-large" | "smaller" | "larger" | float`)
+            strictEqual(data.params.get('legend.fontsize')?.label, `"xx-small" | "x-small" | "small" | "medium" | "large" | "x-large" | "xx-large" | "smaller" | "larger" | float`)
         })
 
         it("custom path", function () {
@@ -686,7 +686,7 @@ if (testing) {
                 return
             }
             try {
-                const { documentation, signatures, errors } = readAll('err', path.join(matches[1], "matplotlib"))
+                const { documentation, params: signatures, errors } = parseMplSource('err', path.join(matches[1], "matplotlib"))
                 deepStrictEqual(errors, [])
                 include(documentation.get("figure.subplot.right")?.comment, 'the right side of the subplots of the figure')
                 strictEqual(signatures.has('font.family'), true)
@@ -697,7 +697,7 @@ if (testing) {
             }
         })
         it("NOENT", () => {
-            include(readAll("noent").errors[0], 'does not exist')
+            include(parseMplSource("noent").errors[0], 'does not exist')
         })
     })
 }
