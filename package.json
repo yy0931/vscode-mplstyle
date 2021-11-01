@@ -63,6 +63,7 @@
 		}
 	},
 	"scripts": {
+		"vscode:prepublish": "python3 scripts/generate_example.py",
 		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js'"
 	},
 	"dependencies": {

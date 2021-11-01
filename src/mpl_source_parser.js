@@ -501,7 +501,7 @@ const parseMatplotlibrc = (/** @type {string} */content) => {
                         : [...subheading2.body, ...(subheading2.target.length <= 1 ? [] : ["", ...subheading2.target.map((v) => `- ${v}`)])]
                 subheading.target.push(pair.key.text)
                 if (sectionHeader !== null) {
-                    comment[2] = [`### ${sectionHeader.title}`, sectionHeader.body]
+                    comment[2] = [`#### ${sectionHeader.title}`, sectionHeader.body]
                 }
 
                 entries.set(pair.key.text, {

@@ -1,4 +1,5 @@
 figure.autolayout: True
-axes.prop_cycle: cycler(color=['green', 'yellow'])
+axes.prop_cycle: cycler(color=['green', 'orange'])
+lines.markersize: 4
 figure.figsize: 6, 2
-figure.facecolor: none
+figure.facecolor: FFFFFFBC

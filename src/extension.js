@@ -71,6 +71,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
     const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
+    const imageDir = path.join(context.extensionPath, "example")
+    const images = new Map(fs.readdirSync(imageDir)
+        .filter((v) => v.endsWith(".png"))
+        .map((v) => [v.slice(0, -".png".length), vscode.Uri.file(path.join(imageDir, v)).toString()]))
+
     const diagnose = () => {
         const editor = vscode.window.activeTextEditor
         if (editor?.document.languageId !== "mplstyle") {
@@ -129,9 +134,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         const type = mpl.params.get(line.key.text)
                         if (type === undefined) { return }
                         const md = new vscode.MarkdownString().appendCodeblock(`${line.key.text}: ${type.label}`, "python")
-                        const imagePath = path.join(context.extensionPath, 'example', line.key.text + ".png")
-                        if (fs.existsSync(imagePath)) {
-                            md.appendMarkdown(`![image](${vscode.Uri.file(imagePath).toString()}|height=150)\n\n`)
+                        const image = images.get(line.key.text)
+                        if (image !== undefined) {
+                            md.appendMarkdown(`![${line.key.text}](${image}|height=150)\n\n`)
                         }
                         return new vscode.Hover(
                             md
@@ -199,9 +204,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
                             item.detail = `${key}: ${type.label}`
                             const md = new vscode.MarkdownString()
-                            const imagePath = path.join(context.extensionPath, 'example', key + ".png")
-                            if (fs.existsSync(imagePath)) {
-                                md.appendMarkdown(`![image](${vscode.Uri.file(imagePath).toString()}|height=150)\n\n`)
+                            const image = images.get(key)
+                            if (image !== undefined) {
+                                md.appendMarkdown(`![${key}](${image}|height=150)\n\n`)
                             }
                             item.documentation = md
                                 .appendMarkdown((mpl.documentation.get(key)?.comment ?? "") + "\n\n---\n#### Example")
