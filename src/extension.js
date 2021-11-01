@@ -1,9 +1,8 @@
 const fs = require("fs")
 const vscode = require("vscode")
 const path = require("path")
-const mplSourceParser = require("./mpl_source_parser")
+const parseMplSource = require("./mpl_source_parser")
 const mplstyleParser = require("./mplstyle_parser")
-const getType = require('./typing')
 const json5 = require('json5')
 
 const json5Parse = (/** @type {string} */text) => {
@@ -64,7 +63,7 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
 }
 
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
-    let { documentation, signatures, cyclerProps, errors } = mplSourceParser.readAll(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+    let { documentation, signatures, cyclerProps, errors } = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
     for (const err of errors) {
         vscode.window.showErrorMessage(`mplstyle: ${err}.`)
     }
@@ -80,11 +79,10 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         const { rc, errors } = mplstyleParser.parseAll(editor.document.getText())
         errors.push(...Array.from(rc.values()).flatMap(/** @returns {{ error: string, severity: import("./mplstyle_parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
             if (pair.value === null) { return [] }  // missing semicolon
-            const signature = signatures.get(pair.key.text)
-            if (signature === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
-            const typeChecker = getType(signature)
-            if (typeChecker.check(pair.value.text) === false) {
-                return [{ error: `${pair.value.text} is not assignable to ${typeChecker.label}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
+            const type = signatures.get(pair.key.text)
+            if (type === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
+            if (type.check(pair.value.text) === false) {
+                return [{ error: `${pair.value.text} is not assignable to ${type.label}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
             }
             return []
         }))
@@ -98,7 +96,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }
 
     const cycler = {
-        kwargs: Array.from(cyclerProps.entries()).map(([k, v]) => `${k}: ${getType(v).shortLabel}`),
+        kwargs: Array.from(cyclerProps.entries()).map(([k, v]) => `${k}: ${v.shortLabel}`),
         label: `label: ${Array.from(cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
     }
 
@@ -113,7 +111,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
         vscode.workspace.onDidChangeConfiguration((ev) => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
-                const out = mplSourceParser.readAll(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+                const out = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
                 for (const err of out.errors) {
                     vscode.window.showErrorMessage(`mplstyle: ${err}.`)
                 }
@@ -130,11 +128,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
                     if (line.key.start <= position.character && position.character < line.key.end) {
                         // Key
-                        const signature = signatures.get(line.key.text)
-                        if (signature === undefined) { return }
+                        const type = signatures.get(line.key.text)
+                        if (type === undefined) { return }
                         return new vscode.Hover(
                             new vscode.MarkdownString()
-                                .appendCodeblock(`${line.key.text}: ${getType(signature).label}`, "python")
+                                .appendCodeblock(`${line.key.text}: ${type.label}`, "python")
                                 .appendMarkdown("---\n" + (documentation.get(line.key.text)?.comment ?? "") + "\n\n---\n#### Example")
                                 .appendCodeblock(`${line.key.text}: ${documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
                             new vscode.Range(position.line, line.key.start, position.line, line.key.end),
@@ -167,9 +165,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         // Value
                         const line = mplstyleParser.parseLine(textLine.text)
                         if (line === null || line.value === null) { return }
-                        const signature = signatures.get(line.key.text)
-                        if (signature === undefined) { return }
-                        const type = getType(signature)
+                        const type = signatures.get(line.key.text)
+                        if (type === undefined) { return }
                         const items = type.constants.map((v) => {
                             const item = new vscode.CompletionItem(v, vscode.CompletionItemKind.Constant)
                             item.detail = "constant"
@@ -182,7 +179,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         })
                         if (type.color) {
                             items.push(...colors(''))
-                        } else if ("type" in signature && signature.type === "cycler") {
+                        } else if (type.label === "cycler") {
                             if (textLine.text.slice(line.value.start, position.character).trim() === "") {
                                 // Function name
                                 const cycler = new vscode.CompletionItem('cycler', vscode.CompletionItemKind.Function)
@@ -196,9 +193,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         return items
                     } else {
                         // Key
-                        return Array.from(signatures.entries()).map(([key, value]) => {
+                        return Array.from(signatures.entries()).map(([key, type]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                            const type = getType(value)
                             item.detail = `${key}: ${type.label}`
                             item.documentation = new vscode.MarkdownString()
                                 .appendMarkdown((documentation.get(key)?.comment ?? "") + "\n\n---\n#### Example")
@@ -208,7 +204,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                                 // Replace the entire line
                                 item.range = textLine.range
                                 item.insertText = new vscode.SnippetString(`${key}: \${1}`)
-                                if (type.color || type.constants.length > 0 || ("type" in value && value.type === "cycler")) {
+                                if (type.color || type.constants.length > 0 || type.label === "cycler") {
                                     item.command = { title: "Trigger Suggest", command: "editor.action.triggerSuggest" }
                                 }
                             } else {
@@ -230,14 +226,14 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     /** @type {vscode.ColorInformation[]} */
                     const result = []
                     for (const { pair, line } of mplstyleParser.parseAll(document.getText()).rc.values()) {
-                        const signature = signatures.get(pair.key.text)
-                        if (signature === undefined || pair.value === null) { continue }
-                        if (getType(signature).color) {
+                        const type = signatures.get(pair.key.text)
+                        if (type === undefined || pair.value === null) { continue }
+                        if (type.color) {
                             const color = toRGBA(pair.value.text, colorMap)
                             if (color !== null) {
                                 result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), color))
                             }
-                        } else if ("type" in signature && signature.type === "cycler") {
+                        } else if (type.label === "cycler") {
                             /** @type {RegExpExecArray | null} */
                             let matches = null
                             // '0.40', 'E24A33', etc.

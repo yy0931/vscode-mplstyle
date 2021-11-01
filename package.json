@@ -59,7 +59,7 @@
 		}
 	},
 	"scripts": {
-		"test": "nyc mocha 'src/**/*.test.js'"
+		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js'"
 	},
 	"dependencies": {
 		"json5": "^2.2.0"
