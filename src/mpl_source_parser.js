@@ -671,7 +671,7 @@ if (testing) {
             strictEqual(data.signatures.has('font.family'), true)
         })
         it("legend.fontsize", () => {
-            strictEqual(data.signatures.get('legend.fontsize')?.label, "")
+            strictEqual(data.signatures.get('legend.fontsize')?.label, `"xx-small" | "x-small" | "small" | "medium" | "large" | "x-large" | "xx-large" | "smaller" | "larger" | float`)
         })
 
         it("custom path", function () {
