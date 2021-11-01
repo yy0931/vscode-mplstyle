@@ -4,6 +4,58 @@ const { assert: { deepStrictEqual, include, fail } } = require("chai")
 const path = require("path")
 const { spawnSync } = require("child_process")
 
+describe("parseDict", () => {
+    it("key-value pairs", () => {
+        deepStrictEqual(mplSourceParser.parseDict(`
+dict_name = {
+    "key1": value1,
+    "key2": value2
+}
+`, 'dict_name'), [{ key: "key1", value: "value1" }, { key: "key2", value: "value2" }])
+    })
+    it("ignore comments", () => {
+        deepStrictEqual(mplSourceParser.parseDict(`
+dict_name = {
+    "key1": value1,  # comment
+}
+`, 'dict_name'), [{ key: "key1", value: "value1" }])
+    })
+    it("ignore whitespace around last comma", () => {
+        deepStrictEqual(mplSourceParser.parseDict(`
+dict_name = {
+    "key1": value1  ,  # comment
+}
+`, 'dict_name'), [{ key: "key1", value: "value1" }])
+    })
+    it("multi-line list literals", () => {
+        deepStrictEqual(mplSourceParser.parseDict(`
+dict_name = {
+    "key1": [  # comment
+        "a",   # comment
+        "b"    # comment
+    ],         # comment
+}
+`, 'dict_name'), [{ key: "key1", value: `["a","b"]` }])
+    })
+    it("function calls", () => {
+        deepStrictEqual(mplSourceParser.parseDict(`
+dict_name = {
+    "key1": func("a", "b") # comment
+}
+`, 'dict_name'), [{ key: "key1", value: `func("a", "b")` }])
+    })
+    it("multi-line function calls", () => {
+        deepStrictEqual(mplSourceParser.parseDict(`
+dict_name = {
+    "key1": func(  # comment
+        "a",   # comment
+        "b"    # comment
+    ),         # comment
+}
+`, 'dict_name'), [{ key: "key1", value: `func("a","b")` }])
+    })
+})
+
 describe("parse _validators", () => {
     const signatures = mplSourceParser.parseValidators(fs.readFileSync("./matplotlib/lib/matplotlib/rcsetup.py").toString())
 
@@ -29,13 +81,13 @@ describe("parse _validators", () => {
         deepStrictEqual(signatures.get("figure.subplot.wspace"), { kind: "0 <= x < 1" })
     })
     it("axes.formatter.limits", () => {
-        deepStrictEqual(signatures.get("axes.formatter.limits"), { kind: "fixed_length_list", len: 2, child: { kind: "validate_", type: "int" } })
+        deepStrictEqual(signatures.get("axes.formatter.limits"), { kind: "list", len: 2, allow_stringlist: false, child: { kind: "validate_", type: "int" } })
     })
 })
 
 it("parse _prop_validators", () => {
     const props = mplSourceParser.parsePropValidators(fs.readFileSync("./matplotlib/lib/matplotlib/rcsetup.py").toString())
-    deepStrictEqual(props.get('color'), { kind: "list", child: { kind: "validate_", type: "color_for_prop_cycle" } })
+    deepStrictEqual(props.get('color'), { kind: "list", len: null, allow_stringlist: true, child: { kind: "validate_", type: "color_for_prop_cycle" } })
     deepStrictEqual(props.get('linewidth'), { kind: "validate_", type: "floatlist" })
 })
 

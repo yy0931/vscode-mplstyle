@@ -52,7 +52,10 @@ describe('typing', () => {
             deepStrictEqual(getType({ kind: "untyped", type: "foo" }).label, `foo (any)`)
         })
         it("fixed length list", () => {
-            deepStrictEqual(getType({ kind: "fixed_length_list", len: 3, child: { kind: "validate_", type: "int" } }).label, `list[int] (len=3)`)
+            deepStrictEqual(getType({ kind: "list", len: 3, allow_stringlist: false, child: { kind: "validate_", type: "int" } }).label, `list[int] (len=3)`)
+        })
+        it("allow_stringlists", () => {
+            deepStrictEqual(getType({ kind: "list", len: null, allow_stringlist: true, child: { kind: "validate_", type: "int" } }).label, `str | list[int]`)
         })
     })
 })

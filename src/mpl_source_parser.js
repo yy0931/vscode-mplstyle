@@ -1,15 +1,28 @@
 const json5 = require("json5")
 const parseMplstyle = require("./mplstyle_parser")
 
-/** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string } | { readonly kind: "fixed_length_list", readonly len: number, child: Signature } | { readonly kind: "list", child: Signature }} Signature */
+/** @typedef {{ readonly kind: "validate_" | "validate_", readonly type: string } | { readonly kind: "0 <= x <= 1" } | { readonly kind: "0 <= x < 1" } | { readonly kind: "enum", readonly values: readonly string[] } | { readonly kind: "untyped", type: string } | { readonly kind: "list", readonly len: number | null, allow_stringlist: boolean, child: Signature }} Signature */
 
 /** https://stackoverflow.com/a/3561711/10710682 */
 const escapeRegExp = (/** @type {string} */string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
 
-const parseDict = (/** @type {string} */content, /** @type {string} */ variableRegexp) => {
+/**
+ * Parse
+ * ```python
+ * <variableNamePattern> = {
+ *     "a": b,  # comment
+ *     "c": d
+ * }
+ * ```
+ * to
+ * ```
+ * [{ key: "a", value: "b" }, { key: "c", value: "d" }]
+ * ```
+ */
+const parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
     content = content
         .replace(/\r/g, "")
-        .replace(new RegExp(String.raw`^(.|\n)*\n${variableRegexp} = \{\n`), "") // remove the code before `_validators = {`
+        .replace(new RegExp(String.raw`^(.|\n)*\n\s*${variableNamePattern}\s*=\s*\{\n`), "") // remove the code before `_validators = {`
 
     /** @type {{ readonly value: string, readonly key: string }[]} */
     const result = []
@@ -25,8 +38,9 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableR
         let matches = null
         // Parse `"foo.bar": validator, # comment`_
         if (matches = /^\s*["']([\w\-_]+(?:\.[\w\-_]+)*)["']\s*:\s*(.*)$/.exec(line)) {
+            const trimLineComment = /^(.*?)\s*(?:#[^"']*)?$/
             const key = matches[1]
-            let value = matches[2]
+            let value = matches[2].replace(trimLineComment, '$1')
             // Read until the next right bracket if there is a unmatched parenthesis
             for (const [left, right] of [["[", "]"], ["(", ")"]]) {
                 if (new RegExp(r`^\w*${escapeRegExp(left)}`).test(value) && !value.includes(right)) {
@@ -35,10 +49,13 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableR
                             value += lines[j].split(right)[0] + right
                             break
                         } else {
-                            value += lines[j].replace(/#.*$/, "")
+                            value += lines[j].replace(trimLineComment, '$1')
                         }
                     }
                 }
+            }
+            if (value.endsWith(",")) {
+                value = value.slice(0, -1).trim()
             }
             result.push({ value, key })
 
@@ -49,9 +66,10 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableR
 
     return result
 }
+exports.parseDict = parseDict
 
 const matchExpr = (/** @type {string} */pattern, /** @type {string} */source) => {
-    return new RegExp(String.raw`^${pattern}(?:\s|\W|,|$)`).exec(source)
+    return new RegExp(String.raw`^${pattern}$`).exec(source)
 }
 
 const r = String.raw.bind(String)
@@ -86,10 +104,11 @@ const parseValidator = (/** @type {string} */source) => {
             console.log(`Parse error: ${matches[1]}`)
             return { kind: "untyped", type: source }
         }
-    } else if (matches = matchExpr(r`_listify_validator\(([^\)]+), n=(\d+)\)`, source)) { // _listify_validator(validate_int, n=2)
-        return { kind: 'fixed_length_list', len: +matches[2], child: parseValidator(matches[1]) }
-    } else if (matches = matchExpr(r`_listify_validator\(([^\)]+)\)`, source)) { // _listify_validator(validate_int, n=2)
-        return { kind: 'list', child: parseValidator(matches[1]) }
+    } else if (matches = matchExpr(r`_listify_validator\(([^\)]+?)(?:,\s*n=(\d+)\s*)?(?:,\s*allow_stringlist=(True|False)\s*)?\)`, source)) { // _listify_validator(validate_int, n=2)
+        const arg1 = matches[1]
+        const n = /** @type {string | undefined} */(matches[2])
+        const allow_stringlist = matches[3]
+        return { kind: 'list', len: n === undefined ? null : +n, allow_stringlist: allow_stringlist === "True", child: parseValidator(arg1) }
     } else if (matches = matchExpr(r`_ignorecase\(([^\)]+)\)`, source)) {
         return parseValidator(matches[1])
     } else {

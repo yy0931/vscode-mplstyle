@@ -37,19 +37,12 @@ const getTypeChecker = (/** @type {import("./mpl_source_parser").Signature} */si
             })
         } case "list": {
             const child = getTypeChecker(signature.child)
+            const left = (signature.allow_stringlist ? "str | " : "") + "list["
+            const right = "]" + (signature.len === null ? '' : ` (len=${signature.len})`)
             return makeType({
-                shortLabel: `list[${child.shortLabel}]`,
-                label: `list[${child.label}]`,
-                check: (x) => x.trim() === '' || x.split(",").map((v) => v.trim()).every((v) => child.check(v)),
-                constants: child.constants,
-                color: child.color,
-            })
-        } case "fixed_length_list": {
-            const child = getTypeChecker(signature.child)
-            return makeType({
-                shortLabel: `list[${child.shortLabel}] (len=${signature.len})`,
-                label: `list[${child.label}] (len=${signature.len})`,
-                check: (x) => x.split(",").length === signature.len && x.split(",").map((v) => v.trim()).every((v) => child.check(v)),
+                shortLabel: left + child.shortLabel + right,
+                label: left + child.label + right,
+                check: (x) => signature.allow_stringlist || (signature.len === null || x.split(",").length === signature.len) && (x.trim() === '' || x.split(",").map((v) => v.trim()).every((v) => child.check(v))),
                 constants: child.constants,
                 color: child.color,
             })
