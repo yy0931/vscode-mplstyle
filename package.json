@@ -32,10 +32,8 @@
 		"languages": [
 			{
 				"id": "mplstyle",
-				"extensions": [
-					"matplotlibrc",
-					".mplstyle"
-				],
+				"extensions": [".mplstyle"],
+				"filenames": ["matplotlibrc"],
 				"configuration": "./language-configuration.json"
 			}
 		],
@@ -56,6 +54,12 @@
 					"description": "path of matplotlib, e.g. /home/foo/.local/lib/python3.10/site-packages/matplotlib"
 				}
 			}
+		}
+	},
+	"capabilities": {
+		"virtualWorkspaces": true,
+		"untrustedWorkspaces": {
+			"supported": true
 		}
 	},
 	"scripts": {
