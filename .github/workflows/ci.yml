@@ -26,6 +26,6 @@ jobs:
 
       - name: Check for updates of Matplotlib
         run: |
-          ./update_matplotlib_source.sh
-          python3 dump_color_map.py
+          ./scripts/update_matplotlib_source.sh
+          python3 ./scripts/dump_color_map.py
           git diff --name-only --exit-code matplotlib color_map.json
