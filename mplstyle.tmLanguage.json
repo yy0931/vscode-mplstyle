@@ -13,7 +13,28 @@
             "end": "($)"
         },
         {
-            "match": "^\\s*((?:\\w|-|[.])*)(:)?",
+            "comment": "Parameters that take Python expressions",
+            "begin": "^\\s*(axes\\.prop_cycle)\\s*(:)?",
+            "end": "$",
+            "beginCaptures": {
+                "0": { "name": "entity.name.label.mplstyle" }
+            },
+            "endCaptures": {
+                "0": { "name": "punctuation.separator.key-value.mapping.mplstyle" }
+            },
+            "name": "meta.embedded.line.python",
+            "patterns": [
+                {
+                    "comment": "Highlight function calls",
+                    "name": "entity.name.function.mplstyle",
+                    "match": "\\b\\w+(?=\\()"
+                },
+                { "include": "source.python" }
+            ]
+        },
+        {
+            "comment": "Parameters that take any values",
+            "match": "^\\s*((?:\\w|-|[.])+)\\s*(:)?",
             "captures": {
                 "1": {
                     "name": "entity.name.label.mplstyle"
@@ -24,21 +45,18 @@
             }
         },
         {
-            "comment": "https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L142-L142 and // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L199",
+            "comment": "Boolean literals. See https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L142-L142 and // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L199",
             "name": "constant.language.mplstyle",
             "match": "(?i)\\b(?:t|y|yes|on|true|f|n|no|off|false|none)\\b"
         },
         {
+            "comment": "Numeric literals",
             "name": "constant.numeric.mplstyle",
             "match": "(?<=[^\\w])[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\b"
         },
         {
             "name": "punctuation.separator.comma.mplstyle",
             "match": ","
-        },
-        {
-            "name": "entity.name.function.mplstyle",
-            "match": "\\b\\w+(?=\\()"
         },
         {
             "match": "(([^\\s,\\[\\]()]+))",

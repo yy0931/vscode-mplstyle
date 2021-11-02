@@ -41,6 +41,9 @@
 			{
 				"language": "mplstyle",
 				"scopeName": "source.mplstyle",
+				"embeddedLanguages": {
+					"meta.embedded.line.python": "python"
+				},
 				"path": "./mplstyle.tmLanguage.json"
 			}
 		],
@@ -52,6 +55,11 @@
 					"type": "string",
 					"default": "",
 					"description": "path of matplotlib, e.g. /home/foo/.local/lib/python3.10/site-packages/matplotlib"
+				},
+				"mplstyle.showComparisonImage": {
+					"type": "boolean",
+					"default": true,
+					"description": "Controls whether to show comparison images in the hover"
 				}
 			}
 		}
