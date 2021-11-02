@@ -135,7 +135,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         if (type === undefined) { return }
                         const md = new vscode.MarkdownString().appendCodeblock(`${line.key.text}: ${type.label}`, "python")
                         const image = images.get(line.key.text)
-                        if (image !== undefined) {
+                        if (vscode.workspace.getConfiguration("mplstyle").get("showComparisonImage") && image !== undefined) {
                             md.appendMarkdown(`![${line.key.text}](${image}|height=150)\n\n`)
                         }
                         return new vscode.Hover(
@@ -200,12 +200,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         return items
                     } else {
                         // Key
+                        const workspaceConfiguration = vscode.workspace.getConfiguration("mplstyle")
                         return Array.from(mpl.params.entries()).map(([key, type]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
                             item.detail = `${key}: ${type.label}`
                             const md = new vscode.MarkdownString()
                             const image = images.get(key)
-                            if (image !== undefined) {
+                            if (workspaceConfiguration.get("showComparisonImage") && image !== undefined) {
                                 md.appendMarkdown(`![${key}](${image}|height=150)\n\n`)
                             }
                             item.documentation = md
