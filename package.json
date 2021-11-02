@@ -2,7 +2,7 @@
 	"name": "mplstyle",
 	"displayName": "mplstyle (Matplotlib)",
 	"description": "Intellisense for .mplstyle and matplotlibrc files",
-	"version": "1.6.1",
+	"version": "1.7.0",
 	"license": "MIT",
 	"publisher": "yy0931",
 	"icon": "matplotlib/logo.png",
@@ -16,7 +16,9 @@
 	"keywords": [
 		"matplotlib",
 		"pyplot",
-		"mplstyle"
+		"mplstyle",
+		"rcParams",
+		"python"
 	],
 	"engines": {
 		"vscode": "^1.53.0"
