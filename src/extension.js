@@ -13,43 +13,46 @@ const json5Parse = (/** @type {string} */text) => {
     }
 }
 
-/** https://github.com/matplotlib/matplotlib/blob/main/lib/matplotlib/colors.py#L195 */
+/**
+ * https://github.com/matplotlib/matplotlib/blob/main/lib/matplotlib/colors.py#L195
+ * @returns {readonly [number, number, number, number] | null}
+ */
 const toRGBA = (/** @type {string} */value, /** @type {Map<string, readonly [number, number, number, number]>} */colorMap) => {
     // none
     if (value.toLowerCase() === "none") {
-        return new vscode.Color(0, 0, 0, 0)
+        return [0, 0, 0, 0]
     }
 
     // red, blue, etc.
     const color = colorMap.get(value)
     if (color !== undefined) {
-        return new vscode.Color(...color)
+        return [...color]
     }
 
     // FFFFFF
     if (/^[a-f0-9]{6}$/i.test(value)) {
-        return new vscode.Color(
+        return [
             parseInt(value.slice(0, 2), 16) / 256,
             parseInt(value.slice(2, 4), 16) / 256,
             parseInt(value.slice(4, 6), 16) / 256,
             1.0,
-        )
+        ]
     }
 
     // FFFFFFFF
     if (/^[a-f0-9]{8}$/i.test(value)) {
-        return new vscode.Color(
+        return [
             parseInt(value.slice(0, 2), 16) / 256,
             parseInt(value.slice(2, 4), 16) / 256,
             parseInt(value.slice(4, 6), 16) / 256,
             parseInt(value.slice(6, 8), 16) / 256,
-        )
+        ]
     }
 
     // 0.0 = black, 1.0 = white
     const x = json5Parse(value)
     if (typeof x === "number") {
-        return new vscode.Color(x, x, x, 1.0)
+        return [x, x, x, 1.0]
     }
 
     return null
@@ -68,6 +71,37 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         vscode.window.showErrorMessage(`mplstyle: ${err}.`)
     }
 
+    const documentations = {
+        key: (/** @type {string} */text, /** @type {parseMplSource.Type} */type, /** @type {boolean} */showComparisonImage, /** @type {Map<string, string>} */images, /** @type {ReturnType<typeof parseMplSource>} */mpl) => {
+            const documentation = new vscode.MarkdownString()
+            const image = images.get(text)
+            if (showComparisonImage && image !== undefined) {
+                documentation.appendMarkdown(`![${text}](${image}|height=150)\n\n`)
+            }
+            documentation.appendMarkdown("---\n" + (mpl.documentation.get(text)?.comment ?? "") + "\n\n---\n#### Example")
+            documentation.appendCodeblock(`${text}: ${mpl.documentation.get(text)?.exampleValue ?? ""}`, "mplstyle")
+            return {
+                detail: {
+                    plaintext: `${text}: ${type.label}`,
+                    md: new vscode.MarkdownString().appendCodeblock(`${text}: ${type.label}`, "python"),
+                },
+                documentation,
+            }
+        },
+        cycler: () => ({
+            detail: {
+                form2: {
+                    param1: `label: ${Array.from(mpl.cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
+                    param2: `values: list`,
+                },
+                form3: {
+                    kwargs: Array.from(mpl.cyclerProps.entries()).map(([k, v]) => `${k}: ${v.shortLabel}`),
+                }
+            },
+            documentation: new vscode.MarkdownString("Creates a `cycler.Cycler` which cycles over one or more colors simultaneously."),
+        })
+    }
+    
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
     const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
@@ -100,11 +134,6 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         )
     }
 
-    const cycler = {
-        kwargs: Array.from(mpl.cyclerProps.entries()).map(([k, v]) => `${k}: ${v.shortLabel}`),
-        label: `label: ${Array.from(mpl.cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
-    }
-
     context.subscriptions.push(
         diagnosticCollection,
         vscode.window.onDidChangeActiveTextEditor(() => { diagnose() }),
@@ -132,27 +161,19 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     if (line.key.start <= position.character && position.character < line.key.end) {
                         // Key
                         const type = mpl.params.get(line.key.text)
-                        if (type === undefined) { return }
-                        const md = new vscode.MarkdownString().appendCodeblock(`${line.key.text}: ${type.label}`, "python")
-                        const image = images.get(line.key.text)
-                        if (vscode.workspace.getConfiguration("mplstyle").get("showComparisonImage") && image !== undefined) {
-                            md.appendMarkdown(`![${line.key.text}](${image}|height=150)\n\n`)
-                        }
-                        return new vscode.Hover(
-                            md
-                                .appendMarkdown("---\n" + (mpl.documentation.get(line.key.text)?.comment ?? "") + "\n\n---\n#### Example")
-                                .appendCodeblock(`${line.key.text}: ${mpl.documentation.get(line.key.text)?.exampleValue ?? ""}`, "mplstyle"),
-                            new vscode.Range(position.line, line.key.start, position.line, line.key.end),
-                        )
+                        if (type == undefined) { return }
+                        const { detail, documentation } = documentations.key(line.key.text, type, vscode.workspace.getConfiguration("mplstyle").get("showComparisonImage") ?? true, images, mpl)
+                        return new vscode.Hover(detail.md.appendMarkdown(documentation.value), new vscode.Range(position.line, line.key.start, position.line, line.key.end))
                     } else if (line.value !== null && line.value.start <= position.character && position.character < line.value.end) {
                         // Value
                         const matches = /^\s*cycler\b/.exec(line.value.text)
                         if (matches !== null && line.value.start + matches.index <= position.character && position.character < line.value.start + matches.index + 'cycler'.length) {
+                            const cycler = documentations.cycler()
                             return new vscode.Hover(
                                 new vscode.MarkdownString()
-                                    .appendCodeblock(`cycler(*, ${cycler.kwargs.join(", ")})\ncycler(label: ${cycler.label}, values: list)`, 'python')
+                                    .appendCodeblock(`cycler(${cycler.detail.form2.param1}, ${cycler.detail.form2.param2})\ncycler(*, ${cycler.detail.form3.kwargs.join(", ")})`, 'python')
                                     .appendMarkdown("---\n")
-                                    .appendMarkdown("Creates a \`cycler.Cycler\` which cycles over one or more colors simultaneously."),
+                                    .appendMarkdown(cycler.documentation.value),
                                 new vscode.Range(position.line, line.value.start + matches.index, position.line, line.value.start + matches.index + 'cycler'.length),
                             )
                         }
@@ -189,10 +210,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         } else if (type.label === "cycler") {
                             if (textLine.text.slice(line.value.start, position.character).trim() === "") {
                                 // Function name
-                                const cycler = new vscode.CompletionItem('cycler', vscode.CompletionItemKind.Function)
-                                cycler.insertText = new vscode.SnippetString("cycler(color=[${1}])")
-                                cycler.command = { title: "Trigger Parameter Hints", command: "editor.action.triggerParameterHints" }
-                                items.push(cycler)
+                                const item = new vscode.CompletionItem('cycler', vscode.CompletionItemKind.Function)
+                                item.insertText = new vscode.SnippetString("cycler(color=[${1}])")
+                                item.command = { title: "Trigger Parameter Hints", command: "editor.action.triggerParameterHints" }
+                                item.documentation = documentations.cycler().documentation
+                                items.push(item)
                             } else {
                                 items.push(...colors("'"))
                             }
@@ -200,18 +222,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         return items
                     } else {
                         // Key
-                        const workspaceConfiguration = vscode.workspace.getConfiguration("mplstyle")
+                        /** @type {boolean} */
+                        const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get("showComparisonImage") ?? true
                         return Array.from(mpl.params.entries()).map(([key, type]) => {
                             const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                            item.detail = `${key}: ${type.label}`
-                            const md = new vscode.MarkdownString()
-                            const image = images.get(key)
-                            if (workspaceConfiguration.get("showComparisonImage") && image !== undefined) {
-                                md.appendMarkdown(`![${key}](${image}|height=150)\n\n`)
-                            }
-                            item.documentation = md
-                                .appendMarkdown((mpl.documentation.get(key)?.comment ?? "") + "\n\n---\n#### Example")
-                                .appendCodeblock(`${key}: ${mpl.documentation.get(key)?.exampleValue ?? ""}`, "mplstyle")
+                            const { detail, documentation } = documentations.key(key, type, showComparisonImage, images, mpl)
+                            item.detail = detail.plaintext
+                            item.documentation = documentation
                             const colon = textLine.text.indexOf(":")
                             if (colon === -1) {
                                 // Replace the entire line
@@ -233,45 +250,6 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 }
             }
         }),
-        vscode.languages.registerColorProvider({ language: "mplstyle" }, {
-            provideDocumentColors(document) {
-                try {
-                    /** @type {vscode.ColorInformation[]} */
-                    const result = []
-                    for (const { pair, line } of mplstyleParser.parseAll(document.getText()).rc.values()) {
-                        const type = mpl.params.get(pair.key.text)
-                        if (type === undefined || pair.value === null) { continue }
-                        if (type.color) {
-                            const color = toRGBA(pair.value.text, colorMap)
-                            if (color !== null) {
-                                result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), color))
-                            }
-                        } else if (type.label === "cycler") {
-                            /** @type {RegExpExecArray | null} */
-                            let matches = null
-                            // '0.40', 'E24A33', etc.
-                            const pattern = /'(?:\w|\d|-|[.])*'|"(?:\w|\d|-|[.])*"/gi
-                            while ((matches = pattern.exec(pair.value.text)) !== null) {
-                                const color = toRGBA(pair.value.text.slice(matches.index + 1, matches.index + matches[0].length - 1), colorMap)
-                                if (color !== null) {
-                                    result.push(new vscode.ColorInformation(
-                                        new vscode.Range(line, pair.value.start + matches.index + 1, line, pair.value.start + matches.index + matches[0].length - 1),
-                                        color,
-                                    ))
-                                }
-                            }
-                        }
-                    }
-                    return result
-                } catch (err) {
-                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
-                    console.error(err)
-                }
-            },
-            provideColorPresentations(color, ctx) {
-                return [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))]
-            }
-        }),
         vscode.languages.registerSignatureHelpProvider({ language: 'mplstyle' }, {
             provideSignatureHelp(document, position) {
                 try {
@@ -280,12 +258,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     if (pair === null || pair.value === null) { return }
                     if (/^\s*cycler\b/.test(pair.value.text)) {
                         // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L618-L618
-                        const form2 = new vscode.SignatureInformation(`cycler(${cycler.label}, values: list[str])`)
-                        form2.parameters = [new vscode.ParameterInformation(cycler.label), new vscode.ParameterInformation(`values: list[str]`)]
-                        const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.kwargs.join(", ")})`)
-                        form3.parameters = cycler.kwargs.map((v) => new vscode.ParameterInformation(v))
-
-                        form2.documentation = form3.documentation = `Creates a \`cycler.Cycler\` which cycles over one or more colors simultaneously.`
+                        const cycler = documentations.cycler()
+                        const form2 = new vscode.SignatureInformation(`cycler(${cycler.detail.form2.param1}, ${cycler.detail.form2.param2})`)
+                        form2.parameters = [new vscode.ParameterInformation(cycler.detail.form2.param1), new vscode.ParameterInformation(cycler.detail.form2.param2)]
+                        const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.detail.form3.kwargs.join(", ")})`)
+                        form3.parameters = cycler.detail.form3.kwargs.map((v) => new vscode.ParameterInformation(v))
+                        
+                        form2.documentation = form3.documentation = cycler.documentation
 
                         const h = new vscode.SignatureHelp()
                         h.signatures = [form2, form3]
@@ -321,6 +300,45 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 }
             }
         }, "(", ",", "="),
+        vscode.languages.registerColorProvider({ language: "mplstyle" }, {
+            provideDocumentColors(document) {
+                try {
+                    /** @type {vscode.ColorInformation[]} */
+                    const result = []
+                    for (const { pair, line } of mplstyleParser.parseAll(document.getText()).rc.values()) {
+                        const type = mpl.params.get(pair.key.text)
+                        if (type === undefined || pair.value === null) { continue }
+                        if (type.color) {
+                            const color = toRGBA(pair.value.text, colorMap)
+                            if (color !== null) {
+                                result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), new vscode.Color(...color)))
+                            }
+                        } else if (type.label === "cycler") {
+                            /** @type {RegExpExecArray | null} */
+                            let matches = null
+                            // '0.40', 'E24A33', etc.
+                            const pattern = /'(?:\w|\d|-|[.])*'|"(?:\w|\d|-|[.])*"/gi
+                            while ((matches = pattern.exec(pair.value.text)) !== null) {
+                                const color = toRGBA(pair.value.text.slice(matches.index + 1, matches.index + matches[0].length - 1), colorMap)
+                                if (color !== null) {
+                                    result.push(new vscode.ColorInformation(
+                                        new vscode.Range(line, pair.value.start + matches.index + 1, line, pair.value.start + matches.index + matches[0].length - 1),
+                                        new vscode.Color(...color),
+                                    ))
+                                }
+                            }
+                        }
+                    }
+                    return result
+                } catch (err) {
+                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
+                    console.error(err)
+                }
+            },
+            provideColorPresentations(color, ctx) {
+                return [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))]
+            }
+        }),
     )
 }
 
