@@ -10,7 +10,7 @@ const testing = typeof globalThis.it === 'function' && typeof globalThis.describ
 
 /** https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/__init__.py#L724-L724 */
 const parseAll = (/** @type {string} */content) => {
-    /** @type {Map<string, { readonly pair: Pair, readonly line: number }>} */
+    /** @type {Map<string, { readonly pair: Pair, readonly line: number }[]>} */
     const rc = new Map()
 
     /** @type {{ error: string, severity: Severity, line: number, columnStart: number, columnEnd: number }[]} */
@@ -22,10 +22,13 @@ const parseAll = (/** @type {string} */content) => {
         if (pair.value === null) {
             errors.push({ error: "Missing colon", severity: "Error", line: lineNumber, columnStart: 0, columnEnd: line.length })
         }
-        if (rc.has(pair.key.text)) {
+        const param = rc.get(pair.key.text)
+        if (param !== undefined) {
             errors.push({ error: `duplicate key "${pair.key.text}"`, severity: "Error", line: lineNumber, columnStart: pair.key.start, columnEnd: pair.key.end })
+            param.push({ pair, line: lineNumber })
+        } else {
+            rc.set(pair.key.text, [{ pair, line: lineNumber }])
         }
-        rc.set(pair.key.text, { pair, line: lineNumber })
     }
 
     return { rc, errors }
@@ -84,8 +87,8 @@ if (testing) {
         it("key-value pairs", () => {
             const { rc, errors } = parseAll(`key1: value1 # comment1\n\nkey2: value2 # comment2`)
             deepStrictEqual(errors, [])
-            deepStrictEqual(rc.get("key1")?.pair.value?.text, "value1")
-            deepStrictEqual(rc.get("key2")?.pair.value?.text, "value2")
+            deepStrictEqual(rc.get("key1")?.[0]?.pair.value?.text, "value1")
+            deepStrictEqual(rc.get("key2")?.[0]?.pair.value?.text, "value2")
         })
         it("missing colon", () => {
             deepStrictEqual(parseAll(`key1 value1`).errors, [{ error: "Missing colon", severity: "Error", line: 0, columnStart: 0, columnEnd: 11 }])

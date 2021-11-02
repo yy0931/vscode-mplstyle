@@ -116,7 +116,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             return
         }
         const { rc, errors } = mplstyleParser.parseAll(editor.document.getText())
-        errors.push(...Array.from(rc.values()).flatMap(/** @returns {{ error: string, severity: import("./mplstyle_parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
+        errors.push(...Array.from(rc.values()).flat().flatMap(/** @returns {{ error: string, severity: import("./mplstyle_parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
             if (pair.value === null) { return [] }  // missing semicolon
             const type = mpl.params.get(pair.key.text)
             if (type === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
@@ -305,7 +305,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 try {
                     /** @type {vscode.ColorInformation[]} */
                     const result = []
-                    for (const { pair, line } of mplstyleParser.parseAll(document.getText()).rc.values()) {
+                    for (const { pair, line } of Array.from(mplstyleParser.parseAll(document.getText()).rc.values()).flat()) {
                         const type = mpl.params.get(pair.key.text)
                         if (type === undefined || pair.value === null) { continue }
                         if (type.color) {
