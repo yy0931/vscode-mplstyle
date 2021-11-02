@@ -1,7 +1,7 @@
 const json5 = require("json5")
-const parseMplstyle = require("./mplstyle_parser")
 const path = require("path")
 const fs = require("fs")
+const parseMatplotlibrc = require("./sample_matplotlibrc_parser")
 const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
 
 const json5Parse = (/** @type {string} */text) => {
@@ -17,6 +17,49 @@ const testing = typeof globalThis.it === 'function' && typeof globalThis.describ
 /** https://stackoverflow.com/a/3561711/10710682 */
 const escapeRegExp = (/** @type {string} */string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
 
+const trimLineComment = (/** @type {string} */source) => {
+    /** @type {string} */
+    let strLiteral = ""
+    for (let i = 0; i < source.length; i++) {
+        const char = source[i]
+        if (strLiteral === "") {
+            if (char === `"` || char === `'`) {
+                strLiteral = char
+                while (source[i + 1] === char) {
+                    strLiteral += source[i + 1]
+                    i++
+                }
+            } else if (char === `#`) {
+                return source.slice(0, i).trimEnd()
+            }
+        } else {
+            if (source.startsWith(strLiteral, i)) {
+                i += strLiteral.length - 1
+                strLiteral = ""
+            } else if (char === '\\') {
+                i++
+            }
+        }
+    }
+
+    return source
+}
+
+if (testing) {
+    const { assert: { strictEqual } } = require("chai")
+
+    describe("trimLineComment", () => {
+        it("simple case", () => { strictEqual(trimLineComment("a # b"), "a") })
+        it("without a comment", () => { strictEqual(trimLineComment("a"), "a") })
+        it("single quotation marks", () => { strictEqual(trimLineComment("'#' # b"), "'#'") })
+        it("double quotation marks", () => { strictEqual(trimLineComment(`"#" # b`), `"#"`) })
+        it("multiple single quotation marks", () => { strictEqual(trimLineComment(`'''#''' # b`), `'''#'''`) })
+        it("multiple double quotation marks", () => { strictEqual(trimLineComment(`"""#""" # b`), `"""#"""`) })
+        it("quotation marks in a string literal 1", () => { strictEqual(trimLineComment(String.raw`"'#\"#" # b`), String.raw`"'#\"#"`) })
+        it("quotation marks in a string literal 2", () => { strictEqual(trimLineComment(`"""'#"#""" # b`), `"""'#"#"""`) })
+    })
+}
+
 /**
  * Parse
  * ```python
@@ -29,7 +72,7 @@ const escapeRegExp = (/** @type {string} */string) => string.replace(/[-\/\\^$*+
  * ```
  * [{ key: "a", value: "b" }, { key: "c", value: "d" }]
  * ```
- * @returns {[{ readonly key: string, readonly value: string }[], string[]]}
+ * @returns {[{ key: string, value: string }[], string[]]}
  */
 const parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
     content = content.replace(/\r/g, "")
@@ -55,9 +98,8 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableN
         let matches = null
         // Parse `"foo.bar": validator, # comment`_
         if (matches = /^\s*["']([\w\-_]+(?:\.[\w\-_]+)*)["']\s*:\s*(.*)$/.exec(line)) {
-            const trimLineComment = /^(.*?)\s*(?:#[^"']*)?$/
             const key = matches[1]
-            let value = matches[2].replace(trimLineComment, '$1')
+            let value = trimLineComment(matches[2])
             // Read until the next right bracket if there is a unmatched parenthesis
             for (const [left, right] of [["[", "]"], ["(", ")"]]) {
                 if (new RegExp(r`^\w*${escapeRegExp(left)}`).test(value) && !value.includes(right)) {
@@ -67,7 +109,7 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableN
                             value += lines[i].split(right)[0] + right
                             break
                         } else {
-                            value += lines[i].replace(trimLineComment, '$1')
+                            value += trimLineComment(lines[i])
                         }
                     }
                 }
@@ -143,6 +185,22 @@ dict_name = {
 `, 'dict_name'), [[{ key: "key1", value: `func("a","b")` }], []])
         })
 
+        it("comments containing double quotes", () => {
+            deepStrictEqual(parseDict(`
+dict_name = {
+    "key": value,  # "foo" 'bar'
+}
+`, 'dict_name'), [[{ key: "key", value: `value` }], []])
+        })
+
+        it("hash sign in a string literal", () => {
+            deepStrictEqual(parseDict(`
+dict_name = {
+    "value": "#000000",
+}
+`, 'dict_name'), [[{ key: "value", value: `"#000000"` }], []])
+        })
+
         it("parse error 1", () => {
             deepStrictEqual(parseDict(`
 dict_name = {
@@ -150,6 +208,7 @@ dict_name = {
 }
 `, 'aa'), [[], [`Parse error: "aa" does not exist`]])
         })
+
         it("parse error 2", () => {
             deepStrictEqual(parseDict(`
 dict_name = {
@@ -212,6 +271,9 @@ const parseValidator = (/** @type {string} */source) => {
         if (type.endsWith("_or_None")) {
             return orEnum(parseValidator(source.slice(0, -"_or_None".length)), ["none"])
         }
+        if (type === "fontsize_None") {
+            return orEnum(parseValidator(source.slice(0, -"_None".length)), ["none"])
+        }
         if (type.endsWith("list")) {
             // key: val1, val2
             return makeList(parseValidator(source.slice(0, -"list".length)), null, false)
@@ -247,24 +309,38 @@ const parseValidator = (/** @type {string} */source) => {
                 return makeType({ label: `str`, check: any })
             case "any":
                 return makeType({ label: `any`, check: any })
-            case "cmap":
+            case "dash":
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L582-L582
+                return parseValidator(`validate_floatlist`)
+            case "hatch": {
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L566-L566
+                return makeType({ label: String.raw`/[\\/|\-+*.xoO]*/`, check: (x) => x === "" || /[\\/|\-+*.xoO]*/.test(x) })
+            } case "cmap":
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L339-L339
+                return makeType({ label: type, check: any })
             case "fonttype":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L224-L224
                 return makeType({ label: type, check: any })
             case "pathlike":
                 return makeType({ label: type, check: any })
+            case "aspect":
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L344-L344
+                return orEnum(parseValidator("validate_float"), ["auto", "equal"], true)
             case "axisbelow":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L152
                 return orEnum(parseValidator("validate_bool"), ["line"], true)
             case "color":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L312-L312
-                return makeType({ label: `color`, check: any, color: true })
+                return makeType({ label: `color | "C0"-"C9"`, check: any, color: true })
             case "color_or_auto":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L277-L277
-                return makeType({ label: `color | "auto"`, check: any, constants: ["auto"], color: true })
+                return makeType({ label: `color | "C0"-"C9" | "auto"`, check: any, constants: ["auto"], color: true })
+            case "color_for_prop_cycle":
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L282-L282
+                return makeType({ label: 'color', check: any, color: true })
             case "color_or_inherit":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L269-L269
-                return makeType({ label: `color | "inherit"`, check: any, constants: ["inherit"], color: true })
+                return makeType({ label: `color | "C0"-"C9" | "inherit"`, check: any, constants: ["inherit"], color: true })
             case "color_or_linecolor":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L289-L289
                 return makeType({ label: `color | "linecolor" | "markerfacecolor" | "markeredgecolor"`, check: any, constants: ["linecolor", "markerfacecolor", "markeredgecolor"], color: true })
@@ -335,7 +411,7 @@ const parseValidator = (/** @type {string} */source) => {
 if (testing) {
     const { assert: { strictEqual } } = require("chai")
 
-    describe('typing', () => {
+    describe('parseValidator', () => {
         describe("type checking", () => {
             it("1, 2.3, 4: validate_floatlist", () => { strictEqual(parseValidator("validate_floatlist").check("1, 2.3, 4"), true) })
             it("         : validate_floatlist", () => { strictEqual(parseValidator("validate_floatlist").check(""), true) })
@@ -393,217 +469,6 @@ if (testing) {
     })
 }
 
-const parseMatplotlibrc = (/** @type {string} */content) => {
-    /** @typedef {[commentStart: string[], subheading: (() => string[]), section: string[]]} LazyComment */
-    /** @type {Map<string, { exampleValue: string, comment: LazyComment }>} */
-    const entries = new Map()
-    /** @type {string | null} */
-    let lastKey = null
-
-    /**
-     * ```
-     * ## **********
-     * ## * title  *
-     * ## **********
-     * ## body
-     * ```
-     * @type {Map<string, string>}
-     */
-    /** @type {null | { title: string, body: string }} */
-    let sectionHeader = null
-    /** @type {null | { title: string, body: string }} */
-    let sectionHeaderBuf = null
-
-    /**
-     * ```
-     * # body1
-     * # body2
-     * target1: value1
-     * target2: value2
-     * ```
-     * @type {{ body: string[], target: string[] }}
-     */
-    let subheading = { body: [], target: [] }
-
-    const lines = content.replaceAll("\r", "").split("\n")
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i]
-
-        // Uncomment the line
-        if (line.startsWith("#")) { line = line.slice(1) }  // `#webagg.port: 8988`
-        if (/^#\w/.test(line)) { line = line.slice(1) }  // `##backend: Agg`
-
-        if (line.startsWith("# *******")) { continue }
-
-        if (sectionHeaderBuf === null) {
-            if (line.startsWith("# * ")) {
-                sectionHeaderBuf = { title: line.slice("# * ".length, -1).trim(), body: "" }
-                subheading = { body: [], target: [] }
-            } else {
-                // Skip empty lines
-                if (line.trim() === "") {
-                    subheading = { body: [], target: [] }
-                    continue
-                }
-
-                // Parse small subheadings
-                // ```
-                // # comment1
-                // # comment2
-                // key1: value1
-                // key2: value2
-                // ```
-                if (/^# /.test(line)) {
-                    if (subheading.target.length > 0) {
-                        subheading = { body: [], target: [] }
-                    }
-                    subheading.body.push(line.slice("# ".length))
-                    continue
-                }
-
-                // Parse multi-line floating comments
-                // ```
-                // key: value  # a
-                //             # b
-                // ```
-                if (/^ +#/.test(line) && lastKey !== null) {
-                    const lastItem = entries.get(lastKey)
-                    if (lastItem !== undefined) {
-                        lastItem.comment[0].push(line.split("#", 2)[1].trimStart())
-                    }
-                    continue
-                }
-
-                if (/^[# ]/.test(line)) {
-                    subheading = { body: [], target: [] }
-                    continue
-                }
-
-                // Parse the line as a key-value pair
-                // ```
-                // key: value
-                // ```
-                const pair = parseMplstyle.parseLine(line)
-                if (pair === null) { continue }
-                if (pair.value === null) {
-                    console.log(`Parse error: ${line}`)
-                    continue
-                }
-                /** @type {LazyComment} */
-                const comment = [[], () => [], []]
-                if (pair.commentStart !== null) {
-                    comment[0] = ([line.slice(pair.commentStart + 1).trim()])
-                }
-                const subheading2 = subheading
-                comment[1] = () =>
-                    subheading2.body.length === 0
-                        ? []
-                        : [...subheading2.body, ...(subheading2.target.length <= 1 ? [] : ["", ...subheading2.target.map((v) => `- ${v}`)])]
-                subheading.target.push(pair.key.text)
-                if (sectionHeader !== null) {
-                    comment[2] = [`#### ${sectionHeader.title}`, sectionHeader.body]
-                }
-
-                entries.set(pair.key.text, {
-                    exampleValue: pair.value.text,
-                    comment,
-                })
-                lastKey = pair.key.text
-            }
-        } else {
-            if (line.startsWith("# ")) {
-                sectionHeaderBuf.body += `${line.slice("# ".length)}\n`
-            } else {
-                if (sectionHeaderBuf.body === "") {
-                    sectionHeader = null
-                } else {
-                    sectionHeader = sectionHeaderBuf
-                }
-                sectionHeaderBuf = null
-                i--
-            }
-        }
-    }
-    return new Map(Array.from(entries.entries()).map(([k, v]) => [k, {
-        exampleValue: v.exampleValue,
-        comment: v.comment.map((v) => Array.isArray(v) ? v : v()).filter((v) => v.length > 0).map(/** @returns {string[]} */(v, i) => [...(i === 0 ? [] : ["", "---"]), ...v]).flat().join("\n"),
-    }]))
-}
-
-if (testing) {
-    const { assert: { deepStrictEqual } } = require("chai")
-
-    describe("parseMatplotlibrc", () => {
-        it("multi-line comments", () => {
-            deepStrictEqual(Array.from(parseMatplotlibrc(`\
-#key1: value1 # key1-comment1
-              # key1-comment2
-#key2: value2 # key2-comment1
-`).entries()), [
-                ['key1', { exampleValue: 'value1', comment: 'key1-comment1\nkey1-comment2' }],
-                ['key2', { exampleValue: 'value2', comment: 'key2-comment1' }],
-            ])
-        })
-        it("subheadings", () => {
-            deepStrictEqual(Array.from(parseMatplotlibrc(`\
-## a
-#key1: value1
-#key2: value2
-
-## b
-#key3: value3
-#key4: value4
-`).entries()), [
-                ['key1', { exampleValue: 'value1', comment: 'a\n\n- key1\n- key2' }],
-                ['key2', { exampleValue: 'value2', comment: 'a\n\n- key1\n- key2' }],
-                ['key3', { exampleValue: 'value3', comment: 'b\n\n- key3\n- key4' }],
-                ['key4', { exampleValue: 'value4', comment: 'b\n\n- key3\n- key4' }],
-            ])
-        })
-        it("Complex comments 1", () => {
-            const entries = parseMatplotlibrc(`
-## ***************************************************************************
-## * SECTION                                                                 *
-## ***************************************************************************
-## section body
-
-## subheading1
-## subheading2
-##key1: value1  # comment1
-                # comment2
-#key2: value2
-`)
-            deepStrictEqual(entries.get("key1"), {
-                exampleValue: "value1", comment: `\
-comment1
-comment2
-
----
-subheading1
-subheading2
-
-- key1
-- key2
-
----
-### SECTION
-section body
-` })
-        })
-        it("Complex comments 2", () => {
-            const entries = parseMatplotlibrc(`
-## ***************************************************************************
-## * SECTION                                                                 *
-## ***************************************************************************
-#key1: value1
-## subheading2
-#key2: value2
-`)
-            deepStrictEqual(entries.get("key1"), { exampleValue: "value1", comment: `` })
-        })
-    })
-}
-
 const parseMplSource = (/** @type {string} */extensionPath, /** @type {unknown} */matplotlibPath) => {
     // Read and parse matplotlib/rcsetup.py
     const useDefaultPath = matplotlibPath === undefined || typeof matplotlibPath !== "string" || matplotlibPath === ""
@@ -638,6 +503,15 @@ const parseMplSource = (/** @type {string} */extensionPath, /** @type {unknown} 
     errors.push(...validators[1].map((v) => `Error during parsing rcsetup.py: ${v}`))
     const propValidators = parseDict(rcsetup, '_prop_validators')
     errors.push(...propValidators[1].map((v) => `Error during parsing rcsetup.py: ${v}`))
+
+    // dirty fix
+    for (const item of validators[0]) {
+        if (item.key === "ps.papersize") {
+            // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L1156-L1156
+            item.value = JSON.stringify(["auto", "letter", "legal", "ledger", ...Array(11).fill(0).map((_, i) => [`a${i}`, `b${i}`]).flat()])
+        }
+    }
+
     return {
         params: new Map(validators[0].map(({ key, value }) => [key, parseValidator(value)])),
         cyclerProps: new Map(propValidators[0].map(({ key, value }) => [key, parseValidator(value)])),
