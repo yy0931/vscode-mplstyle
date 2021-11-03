@@ -4,6 +4,9 @@ const path = require("path")
 const parseMplSource = require("./mpl_source_parser")
 const mplstyleParser = require("./mplstyle_parser")
 const json5 = require('json5')
+const { spawnSync } = require("child_process")
+const which = require("which")
+const tmp = require("tmp")
 
 const json5Parse = (/** @type {string} */text) => {
     try {
@@ -65,6 +68,20 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
         (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
 }
 
+/** @returns {string | null} */
+const findPythonExecutable = () => {
+    for (const pythonPath of [
+        which.sync("python3", { nothrow: true }),
+        which.sync("py", { nothrow: true }),      // Windows
+        which.sync("python", { nothrow: true }),  // May be Python 2
+    ]) {
+        if (pythonPath !== null) {
+            return pythonPath
+        }
+    }
+    return null
+}
+
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     let mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
     for (const err of mpl.errors) {
@@ -101,7 +118,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             documentation: new vscode.MarkdownString("Creates a `cycler.Cycler` which cycles over one or more colors simultaneously."),
         })
     }
-    
+
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
     const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
@@ -134,6 +151,48 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         )
     }
 
+    /** @type {vscode.WebviewPanel | null} */
+    let webviewPanel = null
+    const getWebviewContent = (/** @type {vscode.Webview} */webview) => `\
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https: 'unsafe-inline'; script-src ${webview.cspSource} 'unsafe-inline'; style-src ${webview.cspSource} 'unsafe-inline';"/>
+    <title>Preview</title>
+    <style>
+#preview-error {
+    color: red;
+}
+    </style>
+</head>
+<body>
+    <div id="preview-svg"></div>
+    <div id="preview-error"></div>
+<script>
+const vscode = acquireVsCodeApi()
+const update = (/** @type {{ svg?: string, error?: string }} */data) => {
+    try {
+        document.getElementById("preview-svg").innerHTML = data.svg ?? ""
+        document.getElementById("preview-error").innerHTML = data.error ?? ""
+    } catch (err) {
+        document.getElementById("preview-error").innerHTML = err + ""
+    }
+}
+const prevData = vscode.getState()
+if (prevData) {
+    update(prevData)
+}
+window.addEventListener("message", ({ data }) => {
+    update(data)
+    vscode.setState(data)
+})
+</script>
+</body>
+</html>
+`
     context.subscriptions.push(
         diagnosticCollection,
         vscode.window.onDidChangeActiveTextEditor(() => { diagnose() }),
@@ -142,6 +201,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         vscode.workspace.onDidChangeConfiguration(() => { diagnose() }),
         vscode.workspace.onDidChangeTextDocument(() => { diagnose() }),
         vscode.workspace.onDidCloseTextDocument((doc) => { diagnosticCollection.delete(doc.uri) }),
+        vscode.workspace.onDidSaveTextDocument((doc) => {
+            if (doc === vscode.window.activeTextEditor?.document && doc.languageId === "mplstyle") {
+                vscode.commands.executeCommand("mplstyle.preview")
+            }
+        }),
 
         vscode.workspace.onDidChangeConfiguration((ev) => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
@@ -263,7 +327,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         form2.parameters = [new vscode.ParameterInformation(cycler.detail.form2.param1), new vscode.ParameterInformation(cycler.detail.form2.param2)]
                         const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.detail.form3.kwargs.join(", ")})`)
                         form3.parameters = cycler.detail.form3.kwargs.map((v) => new vscode.ParameterInformation(v))
-                        
+
                         form2.documentation = form3.documentation = cycler.documentation
 
                         const h = new vscode.SignatureHelp()
@@ -337,6 +401,102 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             },
             provideColorPresentations(color, ctx) {
                 return [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))]
+            }
+        }),
+        vscode.commands.registerCommand("mplstyle.preview", () => {
+            try {
+                if (webviewPanel === null) {
+                    webviewPanel = vscode.window.createWebviewPanel("mplstylePreview", "Preview", {
+                        viewColumn: vscode.ViewColumn.Beside,
+                        preserveFocus: true,
+                    }, {
+                        enableScripts: true,
+                        localResourceRoots: [],
+                    })
+                    const webviewPanelDisposed = webviewPanel
+                    webviewPanel.onDidDispose(() => {
+                        if (webviewPanel === webviewPanelDisposed) {
+                            webviewPanel = null
+                        }
+                        webviewPanel = null
+                    }, null, context.subscriptions)
+                    webviewPanel.webview.html = getWebviewContent(webviewPanel.webview)
+                } else {
+                    webviewPanel.reveal(vscode.ViewColumn.Beside, true)
+                }
+                const python = findPythonExecutable()
+                if (python === null) {
+                    vscode.window.showErrorMessage("mplstyle: Could not find a Python executable.")
+                    return
+                }
+                const editor = vscode.window.activeTextEditor
+                if (editor === undefined) { return }
+                if (editor.document.languageId !== "mplstyle") {
+                    vscode.window.showErrorMessage(`mplstyle: Incorrect languageId "${editor?.document.languageId}"`)
+                    return
+                }
+                const f = tmp.fileSync({ postfix: '.mplstyle' })
+                fs.writeFileSync(f.fd, editor.document.getText())
+                const s = spawnSync(python, {
+                    input: `
+import json
+
+try:
+    import io
+    import logging
+
+    import matplotlib.pyplot as plt
+
+    error = io.StringIO()
+    logging.basicConfig(stream=error)
+
+    plt.style.use(${JSON.stringify(f.name)})
+
+    plt.plot([1, 2], [3, 4])
+    svg = io.BytesIO()
+    plt.savefig(svg, format="svg")
+
+    print(json.dumps({
+        "svg": svg.getvalue().decode("utf-8"),
+        "error": error.getvalue(),
+    }))
+except Exception as err:
+    print(json.dumps({
+        "error": str(err),
+    }))
+` })
+                f.removeCallback()
+                if (s.status !== 0) {
+                    vscode.window.showErrorMessage(`mplstyle: ${s.output.join("\n")}`)
+                    return
+                }
+                const outputText = s.output.join("\n").trim()
+                const output = JSON.parse(outputText)
+                if (!(
+                    typeof output === "object" &&
+                    output !== null &&
+                    (output.svg === undefined || typeof output.svg === "string") &&
+                    (output.error === undefined || typeof output.error === "string")
+                )) {
+                    vscode.window.showErrorMessage(`mplstyle: Parse error: ${outputText}`)
+                } else {
+                    webviewPanel.webview.postMessage(output)
+                }
+            } catch (err) {
+                vscode.window.showErrorMessage(`mplstyle: ${err}`)
+                console.error(err)
+            }
+        }),
+        vscode.window.registerWebviewPanelSerializer("mplstylePreview", {
+            async deserializeWebviewPanel(loadedWebviewPanel, state) {
+                webviewPanel = loadedWebviewPanel
+                loadedWebviewPanel.onDidDispose(() => {
+                    if (webviewPanel === loadedWebviewPanel) {
+                        webviewPanel = null
+                    }
+                }, null, context.subscriptions)
+                loadedWebviewPanel.webview.html = getWebviewContent(loadedWebviewPanel.webview)
+                loadedWebviewPanel.webview.postMessage(state)
             }
         }),
     )
