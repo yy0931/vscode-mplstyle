@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{cspSource}} https: 'unsafe-inline'; script-src {{cspSource}} 'unsafe-inline'; style-src {{cspSource}} 'unsafe-inline';"/>
+    <title>Preview</title>
+    <style>
+#error {
+    color: red;
+}
+    </style>
+    <script type="module" src="{{webviewUIToolkit}}"></script>
+</head>
+<body>
+    <div id="svg"></div>
+    <div id="error"></div>
+    <div id="version"></div>
+    <script type="module" src="{{webview.js}}"></script>
+</body>
+</html>

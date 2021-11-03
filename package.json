@@ -35,8 +35,12 @@
 		"languages": [
 			{
 				"id": "mplstyle",
-				"extensions": [".mplstyle"],
-				"filenames": ["matplotlibrc"],
+				"extensions": [
+					".mplstyle"
+				],
+				"filenames": [
+					"matplotlibrc"
+				],
 				"configuration": "./language-configuration.json"
 			}
 		],
@@ -84,6 +88,7 @@
 		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js'"
 	},
 	"dependencies": {
+		"@vscode/webview-ui-toolkit": "^0.8.2",
 		"json5": "^2.2.0",
 		"tmp": "^0.2.1",
 		"which": "^2.0.2"
