@@ -61,12 +61,22 @@
 				"mplstyle.matplotlibPath": {
 					"type": "string",
 					"default": "",
-					"description": "path of matplotlib, e.g. /home/foo/.local/lib/python3.10/site-packages/matplotlib"
+					"description": "The installation directory of matplotlib used to generate the documentation, e.g. /home/foo/.local/lib/python3.10/site-packages/matplotlib. If it is an empty string, the data shipped with the extension will be used."
 				},
 				"mplstyle.showComparisonImage": {
 					"type": "boolean",
 					"default": true,
 					"description": "Controls whether to show comparison images in the hover"
+				},
+				"mplstyle.pythonPath": {
+					"type": "string",
+					"default": "",
+					"description": "Path to the Python executable to display previews, e.g. /usr/bin/python3, defaults to `which python3 || which py || which python`"
+				},
+				"mplstyle.previewOnSave": {
+					"type": "boolean",
+					"default": false,
+					"description": "Controls whether to show a preview on save"
 				}
 			}
 		},

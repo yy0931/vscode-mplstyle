@@ -159,7 +159,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         vscode.workspace.onDidCloseTextDocument((doc) => { diagnosticCollection.delete(doc.uri) }),
         vscode.workspace.onDidSaveTextDocument((doc) => {
             if (doc === vscode.window.activeTextEditor?.document && doc.languageId === "mplstyle") {
-                vscode.commands.executeCommand("mplstyle.preview")
+                vscode.commands.executeCommand("mplstyle.preview", { trigger: "save" })
             }
         }),
 
@@ -359,8 +359,18 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 return [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))]
             }
         }),
-        vscode.commands.registerCommand("mplstyle.preview", async () => {
+        vscode.commands.registerCommand("mplstyle.preview", async (/** @type {{ trigger?: "save" } | undefined} */ opts) => {
             try {
+                if (!vscode.workspace.getConfiguration("mplstyle").get("previewOnSave") && typeof opts === "object" && opts !== null && opts.trigger === "save" && webviewPanel === null) {
+                    return
+                }
+                const python = /** @type {string | undefined} */(vscode.workspace.getConfiguration("mplstyle").get("pythonPath")) || preview.findPythonExecutable()
+                if (typeof python !== "string" || python === "") {
+                    await vscode.window.showErrorMessage("mplstyle: Could not find a Python executable. Specify the path to it in the `mplstyle.pythonPath` configuration if you have a Python executable.")
+                    webviewPanel = null
+                    return
+                }
+
                 if (webviewPanel === null) {
                     webviewPanel = vscode.window.createWebviewPanel("mplstylePreview", "Preview", {
                         viewColumn: vscode.ViewColumn.Beside,
@@ -376,11 +386,6 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     webviewPanel.reveal(vscode.ViewColumn.Beside, true)
                 }
 
-                const python = preview.findPythonExecutable()
-                if (python === null) {
-                    await vscode.window.showErrorMessage("mplstyle: Could not find a Python executable.")
-                    return
-                }
                 const editor = vscode.window.activeTextEditor
                 if (editor === undefined) { return }
                 if (editor.document.languageId !== "mplstyle") {
