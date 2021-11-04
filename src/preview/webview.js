@@ -8,12 +8,23 @@ const get = (/** @type {string} */ selector) => {
     return el
 }
 
-/** @typedef {{ svg?: string, error?: string, python?: { version: string }, matplotlib?: { version: string } }} Data */
+const examples = /** @type {HTMLElement & { value: string }} */(get("#examples"))
+
+/** @typedef {{ svg?: string, error?: string, version?: string, examples?: string[], exampleSelected?: string }} Data */
 const update = (/** @type {Data} */data) => {
     try {
         get("#svg").innerHTML = data.svg ?? ""
         get("#error").innerText = data.error ?? ""
-        get("#version").innerText = `Python ${data.python?.version}, Matplotlib ${data.matplotlib?.version}`
+        get("#version").innerText = data.version ?? ""
+        examples.replaceChildren(...(data.examples ?? []).map((v) => {
+            const option = /** @type {HTMLOptionElement} */(document.createElement(`vscode-option`))
+            option.setAttribute("value", v)
+            if (v === data.exampleSelected) {
+                option.setAttribute("selected", "true")
+            }
+            option.innerText = v
+            return option
+        }))
     } catch (err) {
         get("#error").innerText = err + ""
     }
@@ -28,9 +39,11 @@ window.addEventListener("message", ({ data }) => {
     vscode.setState(data)
 })
 
-document.addEventListener("load", () => {
-    const sel = /** @type {HTMLInputElement} */(get("#script"))
-    sel.addEventListener("change", (ev) => {
-        vscode.postMessage({ script: sel.value })
+window.addEventListener("load", () => {
+    examples.addEventListener("change", (ev) => {
+        vscode.postMessage({ exampleSelected: examples.value })
+    })
+    get("#view-source").addEventListener("click", () => {
+        vscode.postMessage({ viewSource: true })
     })
 })

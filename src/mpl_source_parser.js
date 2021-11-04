@@ -550,7 +550,10 @@ if (testing) {
 
         it("custom path", function () {
             this.timeout(20 * 1000)
-            const { status, stdout, stderr } = spawnSync(`pip3 show matplotlib`, { shell: true })
+            const { status, stdout, stderr, error } = spawnSync(`pip3 show matplotlib`, { shell: true })
+            if (error !== undefined) {
+                fail(error.toString())
+            }
             if (status !== 0) {
                 fail(stderr.toString())
             }
