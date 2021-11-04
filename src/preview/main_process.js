@@ -22,7 +22,7 @@ const findPythonExecutable = () => {
 const getHTML = (/** @type {vscode.WebviewPanel} */webviewPanel, /** @type {string} */extensionPath) => {
     return fs.readFileSync(path.join(extensionPath, "src", "preview", "webview.html")).toString()
         .replaceAll("{{cspSource}}", webviewPanel.webview.cspSource)
-        .replaceAll("{{webviewUIToolkit}}", webviewPanel.webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, "node_modules", "@vscode", "webview-ui-toolkit", "dist", "toolkit.js"))).toString())
+        .replaceAll("{{webviewUIToolkit}}", webviewPanel.webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, "src", "preview", "webview-ui-toolkit.min.js"))).toString())
         .replaceAll("{{webview.js}}", webviewPanel.webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, "src", "preview", "webview.js"))).toString())
 }
 
