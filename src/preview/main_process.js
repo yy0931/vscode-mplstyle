@@ -130,7 +130,7 @@ class Previewer {
         // Render the example
         const f = tmp.fileSync({ postfix: '.mplstyle' })
         fs.writeFileSync(f.fd, document.getText())
-        const s = spawnSync(python, [path.join(this.#extensionPath, "src", "preview", "renderer.py"), f.name, panel.exampleSelected, path.join(this.#extensionPath, "matplotlib")])
+        const s = spawnSync(python, [path.join(this.#extensionPath, "src", "preview", "renderer.py"), JSON.stringify({ style: f.name, example: panel.exampleSelected, baseDir: path.join(this.#extensionPath, "matplotlib") })])
         f.removeCallback()
         if (s.error) {
             await vscode.window.showErrorMessage(`mplstyle: ${s.error}`)

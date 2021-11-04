@@ -28,9 +28,10 @@ try:
     plt.savefig = lambda *args, **kwargs: None
 
     # argv = [_, style, example, extensionPath / "matplotlib"]
-    plt.style.use(sys.argv[1])
-    sys.path.append(sys.argv[3])
-    importlib.import_module(f"examples.{sys.argv[2]}")
+    args = json.loads(sys.argv[1])
+    plt.style.use(args["style"])
+    sys.path.append(args["baseDir"])
+    importlib.import_module(f"examples.{args['example']}")
 
     print(json.dumps({
         "svg": svg.getvalue().decode("utf-8"),
