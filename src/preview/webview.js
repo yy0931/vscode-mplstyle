@@ -9,10 +9,16 @@ const get = (/** @type {string} */ selector) => {
 }
 
 const examples = /** @type {HTMLElement & { value: string }} */(get("#examples"))
+const custom = /** @type {HTMLElement & { checked: boolean }} */(get("#custom"))
 
-/** @typedef {{ svg?: string, error?: string, version?: string, examples?: string[], exampleSelected?: string }} Data */
-const update = (/** @type {Data} */data) => {
+/** @typedef {{ svg?: string, error?: string, version?: string, examples?: string[], exampleSelected?: string, custom?: boolean }} Data */
+const updateDOM = () => {
     try {
+        const data = /** @type {Data | undefined} */(vscode.getState())
+        if (data === undefined) {
+            return
+        }
+
         get("#svg").innerHTML = data.svg ?? ""
         get("#error").innerText = data.error ?? ""
         get("#version").innerText = data.version ?? ""
@@ -25,25 +31,35 @@ const update = (/** @type {Data} */data) => {
             option.innerText = v
             return option
         }))
+        if (data.custom) {
+            examples.setAttribute("disabled", "")
+        } else {
+            examples.removeAttribute("disabled")
+        }
+        custom.checked = data.custom ?? false
     } catch (err) {
+        console.error(err)
         get("#error").innerText = err + ""
     }
 }
 
-const prevData = /** @type {Data | undefined} */(vscode.getState())
-if (prevData) {
-    update(prevData)
-}
+updateDOM()
+
 window.addEventListener("message", ({ data }) => {
-    update(data)
     vscode.setState(data)
+    updateDOM()
 })
 
 window.addEventListener("load", () => {
     examples.addEventListener("change", (ev) => {
-        vscode.postMessage({ exampleSelected: examples.value })
+        vscode.postMessage({ example: examples.value })
     })
     get("#view-source").addEventListener("click", () => {
         vscode.postMessage({ viewSource: true })
+    })
+    custom.addEventListener("change", () => {
+        vscode.setState({ ...vscode.getState(), custom: custom.checked })
+        updateDOM()
+        vscode.postMessage({ custom: custom.checked })
     })
 })

@@ -99,6 +99,7 @@
 		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js' --exclude 'src/preview/*.js'"
 	},
 	"dependencies": {
+		"@vscode/codicons": "^0.0.26",
 		"json5": "^2.2.0",
 		"tmp": "^0.2.1",
 		"which": "^2.0.2"

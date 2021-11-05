@@ -19,13 +19,6 @@ const findPythonExecutable = () => {
     return null
 }
 
-const getHTML = (/** @type {vscode.WebviewPanel} */webviewPanel, /** @type {string} */extensionPath) => {
-    return fs.readFileSync(path.join(extensionPath, "src", "preview", "webview.html")).toString()
-        .replaceAll("{{cspSource}}", webviewPanel.webview.cspSource)
-        .replaceAll("{{webviewUIToolkit}}", webviewPanel.webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, "src", "preview", "webview-ui-toolkit.min.js"))).toString())
-        .replaceAll("{{webview.js}}", webviewPanel.webview.asWebviewUri(vscode.Uri.file(path.join(extensionPath, "src", "preview", "webview.js"))).toString())
-}
-
 const listExamples = (/** @type {string} */extensionPath) =>
     fs.readdirSync(path.join(extensionPath, "matplotlib", "examples"))
         .filter((name) => name.endsWith(".py"))
@@ -51,7 +44,7 @@ const showError = async (f) => {
 }
 
 class Previewer {
-    /** @readonly @type {Map<string, { panel: vscode.WebviewPanel, exampleSelected: string }>} */#panels
+    /** @readonly @type {Map<string, { panel: vscode.WebviewPanel, state: { example: string, custom: boolean } }>} */#panels
     /** @readonly @type {{ dispose(): void }[]} */#subscriptions
     /** @readonly @type {vscode.Uri} */#extensionUri
     /** @readonly @type {string} */#extensionPath
@@ -76,7 +69,12 @@ class Previewer {
                 provideTextDocumentContent: (uri) => {
                     return fs.readFileSync(path.join(this.#extensionPath, "matplotlib", "examples", uri.path)).toString()
                 }
-            })
+            }),
+            vscode.workspace.registerTextDocumentContentProvider("mplstyle.custom", {
+                provideTextDocumentContent: (uri) => {
+                    return fs.readFileSync(path.join(this.#extensionPath, "matplotlib", "examples", uri.path)).toString()
+                }
+            }),
         ]
     }
     async reveal(/** @type {vscode.TextDocument} */document) {
@@ -96,6 +94,7 @@ class Previewer {
         // Open the panel
         let panel = this.#panels.get(document.uri.toString())
         if (panel === undefined) {
+            /** @type {typeof panel} */
             const newPanel = panel = {
                 panel: vscode.window.createWebviewPanel("mplstylePreview", `Preview: ${path.basename(document.fileName)}`, {
                     viewColumn: vscode.ViewColumn.Beside,
@@ -104,33 +103,44 @@ class Previewer {
                     enableScripts: true,
                     localResourceRoots: [this.#extensionUri],
                 }),
-                exampleSelected: examples[0],
+                state: {
+                    example: examples[0],
+                    custom: false,
+                },
             }
             this.#panels.set(document.uri.toString(), newPanel)
             newPanel.panel.onDidDispose(() => {
                 this.#panels.delete(document.uri.toString())
             }, null, this.#subscriptions)
-            newPanel.panel.webview.onDidReceiveMessage((/** @type {{ exampleSelected?: string, viewSource?: true }} */data) => showError(async () => {
-                if (data.viewSource && newPanel.exampleSelected !== "") {
-                    await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + newPanel.exampleSelected + ".py"), { })
-                }
-                if (data.exampleSelected) {
-                    newPanel.exampleSelected = data.exampleSelected
+            newPanel.panel.webview.onDidReceiveMessage((/** @type {{ example?: string, viewSource?: true, custom?: boolean }} */data) => showError(async () => {
+                if (data.example) {
+                    newPanel.state.example = data.example
                     await this.reveal(document)
                 }
+                if (data.viewSource && newPanel.state.example !== "") {
+                    await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + newPanel.state.example + ".py"), { })
+                }
+                if (data.custom !== undefined) {
+                    newPanel.state.custom = data.custom
+                    await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.custom:plot.py"), { })
+                }
             }), null, this.#subscriptions)
-            panel.panel.webview.html = getHTML(panel.panel, this.#extensionPath)
+            panel.panel.webview.html = fs.readFileSync(path.join(this.#extensionPath, "src", "preview", "webview.html")).toString()
+                .replaceAll("{{cspSource}}", panel.panel.webview.cspSource)
+                .replaceAll("{{webviewUIToolkit}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview-ui-toolkit.min.js")).toString())
+                .replaceAll("{{webview.js}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview.js")).toString())
+                .replaceAll("{{codicons}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')).toString())
         } else {
             panel.panel.reveal(vscode.ViewColumn.Beside, true)
-            if (!examples.includes(panel.exampleSelected)) {
-                panel.exampleSelected = examples[0]
+            if (!examples.includes(panel.state.example)) {
+                panel.state.example = examples[0]
             }
         }
 
         // Render the example
         const f = tmp.fileSync({ postfix: '.mplstyle' })
         fs.writeFileSync(f.fd, document.getText())
-        const s = spawnSync(python, [path.join(this.#extensionPath, "src", "preview", "renderer.py"), JSON.stringify({ style: f.name, example: panel.exampleSelected, baseDir: path.join(this.#extensionPath, "matplotlib") })])
+        const s = spawnSync(python, [path.join(this.#extensionPath, "src", "preview", "renderer.py"), JSON.stringify({ style: f.name, ...panel.state, baseDir: path.join(this.#extensionPath, "matplotlib") })])
         f.removeCallback()
         if (s.error) {
             await vscode.window.showErrorMessage(`mplstyle: ${s.error}`)
@@ -146,7 +156,7 @@ class Previewer {
             return
         }
 
-        await panel.panel.webview.postMessage({ ...output, examples, exampleSelected: panel.exampleSelected })
+        await panel.panel.webview.postMessage({ ...output, examples, ...panel.state })
     }
     dispose() {
         for (const s of this.#subscriptions) {
