@@ -399,9 +399,11 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         }),
         vscode.languages.registerCodeLensProvider({ language: "mplstyle" }, {
             provideCodeLenses(document) {
-                return [
-                    new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), { command: "mplstyle.preview", title: "mplstyle: Preview" })
-                ]
+                if (vscode.workspace.getConfiguration("mplstyle").get("showPreviewButton")) {
+                    return [new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), { command: "mplstyle.preview", title: "mplstyle: Preview" })]
+                } else {
+                    return []
+                }
             }
         })
     )

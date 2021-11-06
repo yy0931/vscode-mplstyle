@@ -71,12 +71,17 @@
 				"mplstyle.pythonPath": {
 					"type": "string",
 					"default": "",
-					"description": "Path to the Python executable to display previews, e.g. /usr/bin/python3, defaults to `which python3 || which py || which python`"
+					"description": "Path to the Python executable to display previews, e.g. /usr/bin/python3, defaults to the output of `which python3 || which py || which python`"
 				},
 				"mplstyle.previewOnSave": {
 					"type": "boolean",
 					"default": false,
 					"description": "Controls whether to show a preview on save"
+				},
+				"mplstyle.showPreviewButton": {
+					"type": "boolean",
+					"default": true,
+					"description": "Controls whether to show a button to show previewer on the editor"
 				}
 			}
 		},
