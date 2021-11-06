@@ -1,6 +1,7 @@
 import json
 
 try:
+    # Collect warnings with the `warnings` module
     import warnings
 
     warning_list = []
@@ -10,6 +11,7 @@ try:
 
     warnings.showwarning = showwarning
 
+    # Collect errors with the `logging` module
     import io
     import logging
     logging_io = io.StringIO()
@@ -21,18 +23,19 @@ try:
     import matplotlib
     import matplotlib.pyplot as plt
 
+    # Save figures on `plt.show()` and disable plt.savefig()
     savefig = plt.savefig
     svg = io.BytesIO()
-
     plt.show = lambda *args, **kwargs: savefig(svg, format="svg")
     plt.savefig = lambda *args, **kwargs: None
 
-    # argv = [_, style, example, extensionPath / "matplotlib"]
+    # Plot figures
     args = json.loads(sys.argv[1])
     plt.style.use(args["style"])
     sys.path.append(args["baseDir"])
     importlib.import_module(f"examples.{args['example']}")
 
+    # Output the result to stdout in JSON format
     print(json.dumps({
         "svg": svg.getvalue().decode("utf-8"),
         "error": (logging_io.getvalue() + "\n" + "\n".join(warning_list)).strip(),
