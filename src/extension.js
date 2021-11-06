@@ -5,11 +5,21 @@ const parseMplSource = require("./mpl_source_parser")
 const mplstyleParser = require("./mplstyle_parser")
 const json5 = require('json5')
 const rcParamsParser = require("./rc_params_parser")
+const preview = require("./preview/main_process")
 
 const json5Parse = (/** @type {string} */text) => {
     try {
         return json5.parse(text)
     } catch (err) {
+        return err
+    }
+}
+
+const jsonParse = (/** @type {string} */text) => {
+    try {
+        return JSON.parse(text)
+    } catch (err) {
+        console.error(JSON.stringify(text))
         return err
     }
 }
@@ -66,6 +76,16 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
         (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
 }
 
+/** @type {<T>(f: () => Promise<T>) => Promise<T | undefined>} */
+const showError = async (f) => {
+    try {
+        return f()
+    } catch (err) {
+        await vscode.window.showErrorMessage(`mplstyle: ${err}`)
+        console.error(err)
+    }
+}
+
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     let mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
     for (const err of mpl.errors) {
@@ -104,7 +124,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
-    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
+    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
     const imageDir = path.join(context.extensionPath, "example")
     const images = new Map(fs.readdirSync(imageDir)
@@ -139,14 +159,16 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         )
     }
 
+
     context.subscriptions.push(
         diagnosticCollection,
+        new preview.Previewer(context.extensionUri, context.extensionPath),
         vscode.window.onDidChangeActiveTextEditor(() => { diagnose() }),
         vscode.window.onDidChangeTextEditorOptions(() => { diagnose() }),
         vscode.workspace.onDidOpenTextDocument(() => { diagnose() }),
         vscode.workspace.onDidChangeConfiguration(() => { diagnose() }),
         vscode.workspace.onDidChangeTextDocument(() => { diagnose() }),
-        vscode.workspace.onDidCloseTextDocument((doc) => { diagnosticCollection.delete(doc.uri) }),
+        vscode.workspace.onDidCloseTextDocument((document) => { diagnosticCollection.delete(document.uri) }),
 
         vscode.workspace.onDidChangeConfiguration((ev) => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
@@ -176,8 +198,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         }),
 
         vscode.languages.registerHoverProvider({ language: "mplstyle" }, {
-            provideHover(document, position) {
-                try {
+            async provideHover(document, position) {
+                return showError(async () => {
                     const line = mplstyleParser.parseLine(document.lineAt(position.line).text)
                     if (line === null) { return }
 
@@ -200,12 +222,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                                 new vscode.Range(position.line, line.value.start + matches.index, position.line, line.value.start + matches.index + 'cycler'.length),
                             )
                         }
-                        return
                     }
-                } catch (err) {
-                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
-                    console.error(err)
-                }
+                })
             }
         }),
 
@@ -232,8 +250,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         }, `"`, `'`),
 
         vscode.languages.registerCompletionItemProvider({ language: "mplstyle" }, {
-            provideCompletionItems(document, position) {
-                try {
+            async provideCompletionItems(document, position) {
+                return showError(async () => {
                     const textLine = document.lineAt(position.line)
                     if (textLine.text.slice(0, position.character).includes(":")) {
                         // Value
@@ -290,16 +308,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             return item
                         })
                     }
-                } catch (err) {
-                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
-                    console.error(err)
-                }
+                })
             }
         }),
 
         vscode.languages.registerSignatureHelpProvider({ language: 'mplstyle' }, {
-            provideSignatureHelp(document, position) {
-                try {
+            async provideSignatureHelp(document, position) {
+                return showError(async () => {
                     const textLine = document.lineAt(position.line)
                     const pair = mplstyleParser.parseLine(textLine.text)
                     if (pair === null || pair.value === null) { return }
@@ -341,16 +356,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         }
                         return h
                     }
-                } catch (err) {
-                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
-                    console.error(err)
-                }
+                })
             }
         }, "(", ",", "="),
 
         vscode.languages.registerColorProvider({ language: "mplstyle" }, {
-            provideDocumentColors(document) {
-                try {
+            async provideDocumentColors(document) {
+                return showError(async () => {
                     /** @type {vscode.ColorInformation[]} */
                     const result = []
                     for (const { pair, line } of Array.from(mplstyleParser.parseAll(document.getText()).rc.values()).flat()) {
@@ -379,15 +391,19 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         }
                     }
                     return result
-                } catch (err) {
-                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
-                    console.error(err)
-                }
+                })
             },
             provideColorPresentations(color, ctx) {
                 return [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))]
             }
         }),
+        vscode.languages.registerCodeLensProvider({ language: "mplstyle" }, {
+            provideCodeLenses(document) {
+                return [
+                    new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), { command: "mplstyle.preview", title: "mplstyle: Preview" })
+                ]
+            }
+        })
     )
 }
 

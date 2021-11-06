@@ -4,7 +4,7 @@ on:
   schedule:
     - cron: 45 9 * * 6  # At 09:45 on Saturday
 jobs:
-  test:
+  test_language_features:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -27,3 +27,24 @@ jobs:
           ./scripts/update_matplotlib_source.sh
           python3 ./scripts/dump_color_map.py
           git diff --name-only --exit-code matplotlib color_map.json
+
+  test_example_scripts:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.6', '3.10', 'pypy-3.6']
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: "pre-release"
+      run: |
+        python3 -m pip uninstall -y matplotlib
+        python3 -m pip install matplotlib --pre
+        ./scripts/test_examples.sh
+    - name: "stable-release"
+      run: |
+        python3 -m pip uninstall -y matplotlib
+        python3 -m pip install matplotlib
+        ./scripts/test_examples.sh

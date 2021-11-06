@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src {{cspSource}} https: data:; script-src {{cspSource}} 'unsafe-inline'; style-src {{cspSource}} 'unsafe-inline'; font-src {{cspSource}};"/>
+    <title>Preview</title>
+    <style>
+#error {
+    color: red;
+}
+#code {
+    width: 100%;
+}
+#examples {
+    min-width: 300px;
+}
+p {
+    margin-bottom: 0.5rem;
+}
+section {
+    margin-bottom: 0.5rem;
+}
+.checkered {
+    width: 100%;
+    padding-top: 30px;
+    padding-bottom: 30px;
+    text-align: center;
+    /* https://stackoverflow.com/a/65129916/10710682 */
+    background: repeating-conic-gradient(#6f6f6f7a 0% 25%, transparent 0% 50%) 50% / 20px 20px;
+}
+.checkered svg {
+    max-width: 100%;
+    height: auto;
+}
+    </style>
+    <link href="{{codicons}}" rel="stylesheet" />
+    <script type="module" src="{{webviewUIToolkit}}"></script>
+</head>
+<body>
+    <section>
+        <p>Example</p>
+        <vscode-dropdown id="examples"></vscode-dropdown>
+        <vscode-button id="view-source">View Source</vscode-button>
+    </section>
+
+    <section id="svg" class="checkered"></section>
+    <section id="error"></section>
+    <section id="version"></section>
+    <script type="module" src="{{webview.js}}"></script>
+</body>
+</html>

@@ -7,3 +7,4 @@ color_provider.png
 .nyc_output
 scripts/**
 .github/**
+__pycache__/**
