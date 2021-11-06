@@ -8,7 +8,7 @@ Intellisense for .mplstyle and matplotlibrc files.
 
 ---
 
-![screenshot](https://raw.githubusercontent.com/yy0931/vscode-mplstyle/master/color_provider.png)
+![screenshot_color](https://raw.githubusercontent.com/yy0931/vscode-mplstyle/master/color_provider.png)
 
 ## Features
 - [x] Syntax highlighting
@@ -16,4 +16,4 @@ Intellisense for .mplstyle and matplotlibrc files.
 - [x] Hover provider
 - [x] Type checking
 - [x] Color picker
-
+- [x] Previewer (optional, requires Python 3.6+ and matplotlib 3.4+)
