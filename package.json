@@ -27,7 +27,8 @@
 		"Programming Languages"
 	],
 	"activationEvents": [
-		"onLanguage:mplstyle"
+		"onLanguage:mplstyle",
+		"onLanguage:python"
 	],
 	"main": "./src/extension.js",
 	"contributes": {
@@ -73,6 +74,7 @@
 		}
 	},
 	"scripts": {
+		"prepare": "python3 scripts/generate_example.py",
 		"vscode:prepublish": "python3 scripts/generate_example.py",
 		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js'"
 	},

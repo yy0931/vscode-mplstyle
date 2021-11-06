@@ -4,6 +4,7 @@ const path = require("path")
 const parseMplSource = require("./mpl_source_parser")
 const mplstyleParser = require("./mplstyle_parser")
 const json5 = require('json5')
+const rcParamsParser = require("./rc_params_parser")
 
 const json5Parse = (/** @type {string} */text) => {
     try {
@@ -101,7 +102,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             documentation: new vscode.MarkdownString("Creates a `cycler.Cycler` which cycles over one or more colors simultaneously."),
         })
     }
-    
+
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
     const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
 
@@ -127,10 +128,14 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         }))
         diagnosticCollection.set(
             editor.document.uri,
-            errors.map((err) => new vscode.Diagnostic(
-                new vscode.Range(err.line, err.columnStart, err.line, err.columnEnd), `${err.severity}: ${err.error}`,
-                vscode.DiagnosticSeverity[err.severity]
-            )),
+            errors.map((err) => {
+                const d = new vscode.Diagnostic(
+                    new vscode.Range(err.line, err.columnStart, err.line, err.columnEnd), err.error,
+                    vscode.DiagnosticSeverity[err.severity]
+                )
+                d.source = "mplstyle"
+                return d
+            }),
         )
     }
 
@@ -148,6 +153,24 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
                 for (const err of mpl.errors) {
                     vscode.window.showErrorMessage(`mplstyle: ${err}.`)
+                }
+            }
+        }),
+
+        vscode.languages.registerHoverProvider({ language: "python" }, {
+            provideHover(document, position) {
+                try {
+                    for (const { index, key } of rcParamsParser.findRcParams(document.lineAt(position.line).text)) {
+                        if (index <= position.character && position.character < index + key.length) {
+                            const type = mpl.params.get(key)
+                            if (type === undefined) { break }
+                            const { detail, documentation } = documentations.key(key, type, vscode.workspace.getConfiguration("mplstyle").get("showComparisonImage") ?? true, images, mpl)
+                            return new vscode.Hover(detail.md.appendMarkdown(documentation.value), new vscode.Range(position.line, index, position.line, index + key.length))
+                        }
+                    }
+                } catch (err) {
+                    console.error(err)
+                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
                 }
             }
         }),
@@ -185,6 +208,29 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 }
             }
         }),
+
+        vscode.languages.registerCompletionItemProvider({ language: "python" }, {
+            provideCompletionItems(document, position) {
+                try {
+                    for (const match of rcParamsParser.findRcParams(document.lineAt(position.line).text)) {
+                        if (!(match.index <= position.character && position.character <= match.index + match.key.length)) { continue }
+                        const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get("showComparisonImage") ?? true
+                        return Array.from(mpl.params.entries()).map(([key, type]) => {
+                            const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
+                            const { detail, documentation } = documentations.key(key, type, showComparisonImage, images, mpl)
+                            item.detail = `${detail.plaintext} (mplstyle)`
+                            item.documentation = documentation
+                            item.range = new vscode.Range(position.line, match.index, position.line, match.index + match.key.length)
+                            return item
+                        })
+                    }
+                } catch (err) {
+                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
+                    console.error(err)
+                }
+            }
+        }, `"`, `'`),
+
         vscode.languages.registerCompletionItemProvider({ language: "mplstyle" }, {
             provideCompletionItems(document, position) {
                 try {
@@ -250,6 +296,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 }
             }
         }),
+
         vscode.languages.registerSignatureHelpProvider({ language: 'mplstyle' }, {
             provideSignatureHelp(document, position) {
                 try {
@@ -263,7 +310,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         form2.parameters = [new vscode.ParameterInformation(cycler.detail.form2.param1), new vscode.ParameterInformation(cycler.detail.form2.param2)]
                         const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.detail.form3.kwargs.join(", ")})`)
                         form3.parameters = cycler.detail.form3.kwargs.map((v) => new vscode.ParameterInformation(v))
-                        
+
                         form2.documentation = form3.documentation = cycler.documentation
 
                         const h = new vscode.SignatureHelp()
@@ -300,6 +347,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 }
             }
         }, "(", ",", "="),
+
         vscode.languages.registerColorProvider({ language: "mplstyle" }, {
             provideDocumentColors(document) {
                 try {
@@ -318,7 +366,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             let matches = null
                             // '0.40', 'E24A33', etc.
                             const pattern = /'(?:\w|\d|-|[.])*'|"(?:\w|\d|-|[.])*"/gi
-                            while ((matches = pattern.exec(pair.value.text)) !== null) {
+                            for (const matches of pair.value.text.matchAll(pattern)) {
+                                if (matches.index === undefined) { continue }
                                 const color = toRGBA(pair.value.text.slice(matches.index + 1, matches.index + matches[0].length - 1), colorMap)
                                 if (color !== null) {
                                     result.push(new vscode.ColorInformation(
