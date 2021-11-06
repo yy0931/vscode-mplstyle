@@ -8,15 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - name: Install Matplotlib from pypi
+        run: pip3 install matplotlib numpy
       - uses: actions/setup-node@v2
         with:
           node-version: 16.x
       - run: npm ci -D
-
-      - name: Install Matplotlib from pypi
-        run: pip3 install matplotlib numpy
       - run: npm test
-
       - name: Install Matplotlib from GitHub
         run: |
           pip3 uninstall matplotlib -y
