@@ -8,3 +8,4 @@ color_provider.png
 scripts/**
 .github/**
 **/__pycache__/**
+.vscode-test-web/

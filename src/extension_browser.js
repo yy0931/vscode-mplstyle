@@ -94,6 +94,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
     const logger = new Logger()
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
+    logger.info(`extensionUri: ${context.extensionUri}`)
 
     let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT)
     for (const err of mpl.errors) {
@@ -133,11 +134,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
     const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse(await readFile(vscode.Uri.joinPath(context.extensionUri, "color_map.json"))))))
+    logger.info(`The number of color names: ${colorMap.size}`)
 
     const imageDir = vscode.Uri.joinPath(context.extensionUri, "example")
-    const images = new Map((await vscode.workspace.fs.readDirectory(imageDir))
-        .filter(([v, _]) => v.endsWith(".png"))
-        .map(([v, _]) => [v.slice(0, -".png".length), vscode.Uri.joinPath(imageDir, v).toString()]))
+    // NOTE: vscode.workspace.fs.readDirectory() does not work on browsers
+    const images = new Map(new TextDecoder().decode(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(imageDir, "index.txt"))).split("\n")
+        .map((filename) => [filename.slice(0, -".png".length), vscode.Uri.joinPath(imageDir, filename).toString()]))
 
     const diagnose = () => {
         const editor = vscode.window.activeTextEditor

@@ -175,3 +175,5 @@ legend.numpoints: 2
 legend.markerscale: 2.0
 """):
     render_figure(plot_axes_legend, *values[0], values[1:])
+
+(out_dir / "index.txt").write_text("\n".join(f.name for f in out_dir.iterdir()))

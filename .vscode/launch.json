@@ -23,6 +23,6 @@
 			  "--extensionDevelopmentKind=web"
 			],
 			"preLaunchTask": "npm: webpack"
-		  }
+		}
 	]
 }
