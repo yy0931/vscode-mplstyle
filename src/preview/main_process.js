@@ -4,6 +4,7 @@ const vscode = require("vscode")
 const which = require("which")
 const tmp = require("tmp")
 const { spawnSync } = require("child_process")
+const Logger = require("../logger")
 
 /** @returns {string | null} */
 const findPythonExecutable = () => {
@@ -33,52 +34,45 @@ const jsonParse = (/** @type {string} */text) => {
     }
 }
 
-/** @type {<T>(f: () => Promise<T>) => Promise<T | undefined>} */
-const showError = async (f) => {
-    try {
-        return f()
-    } catch (err) {
-        await vscode.window.showErrorMessage(`mplstyle: ${err}`)
-        console.error(err)
-    }
-}
-
 class Previewer {
     /** @readonly @type {Map<string, { panel: vscode.WebviewPanel, state: { example: string } }>} */#panels
     /** @readonly @type {{ dispose(): void }[]} */#subscriptions
     /** @readonly @type {vscode.Uri} */#extensionUri
     /** @readonly @type {string} */#extensionPath
+    /** @readonly @type {Logger} */#logger
 
-    constructor(/** @type {vscode.Uri} */extensionUri, /** @type {string} */extensionPath) {
+    constructor(/** @type {vscode.Uri} */extensionUri, /** @type {string} */extensionPath, /** @type {Logger} */ logger) {
         this.#extensionUri = extensionUri
         this.#extensionPath = extensionPath
         this.#panels = new Map()
+        this.#logger = logger
 
         this.#subscriptions = [
-            vscode.workspace.onDidSaveTextDocument((document) => showError(async () => {
+            vscode.workspace.onDidSaveTextDocument((document) => logger.try(async () => {
                 if (vscode.workspace.getConfiguration("mplstyle").get("previewOnSave") || this.#panels.has(document.uri.toString())) {
                     await this.reveal(document)
                 }
             })),
-            vscode.commands.registerCommand("mplstyle.preview", () => showError(async () => {
+            vscode.commands.registerCommand("mplstyle.preview", () => logger.try(async () => {
                 const editor = vscode.window.activeTextEditor
                 if (editor === undefined) { return }
                 await this.reveal(editor.document)
             })),
             vscode.workspace.registerTextDocumentContentProvider("mplstyle.example", {
-                provideTextDocumentContent: (uri) => {
+                provideTextDocumentContent: (uri) => logger.trySync(() => {
                     return fs.readFileSync(path.join(this.#extensionPath, "matplotlib", "examples", uri.path)).toString()
-                }
+                })
             }),
         ]
     }
     async reveal(/** @type {vscode.TextDocument} */document) {
+        this.#logger.info(`Previewer.reveal (uri = ${document.uri}, languageId = ${document.languageId})`)
         if (document.languageId !== "mplstyle") { return }
 
         // Get a python executable
         const python = /** @type {string | undefined} */(vscode.workspace.getConfiguration("mplstyle").get("pythonPath")) || findPythonExecutable()
         if (typeof python !== "string" || python === "") {
-            await vscode.window.showErrorMessage("mplstyle: Could not find a Python executable. Specify the path to it in the `mplstyle.pythonPath` configuration if you have a Python executable.")
+            this.#logger.error("Could not find a Python executable. Specify the path to it in the `mplstyle.pythonPath` configuration if you have a Python executable.")
             return
         }
 
@@ -89,6 +83,7 @@ class Previewer {
         // Open the panel
         let panel = this.#panels.get(document.uri.toString())
         if (panel === undefined) {
+            this.#logger.info(`The panel for ${document.uri} was not found, creating one`)
             /** @type {typeof panel} */
             const newPanel = panel = {
                 panel: vscode.window.createWebviewPanel("mplstylePreview", `Preview: ${path.basename(document.fileName)}`, {
@@ -104,9 +99,11 @@ class Previewer {
             }
             this.#panels.set(document.uri.toString(), newPanel)
             newPanel.panel.onDidDispose(() => {
+                this.#logger.info(`The panel for ${document.uri} has been closed`)
                 this.#panels.delete(document.uri.toString())
             }, null, this.#subscriptions)
-            newPanel.panel.webview.onDidReceiveMessage((/** @type {{ example?: string, viewSource?: true }} */data) => showError(async () => {
+            newPanel.panel.webview.onDidReceiveMessage((/** @type {{ example?: string, viewSource?: true }} */data) => this.#logger.try(async () => {
+                this.#logger.info(`Received a message ${JSON.stringify(data)} (uri = ${document.uri})`)
                 if (data.example) {
                     newPanel.state.example = data.example
                     await this.reveal(document)
@@ -121,6 +118,7 @@ class Previewer {
                 .replaceAll("{{webview.js}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview.js")).toString())
                 .replaceAll("{{codicons}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')).toString())
         } else {
+            this.#logger.info(`The panel for ${document.uri} was found`)
             panel.panel.reveal(vscode.ViewColumn.Beside, true)
             if (!examples.includes(panel.state.example)) {
                 panel.state.example = examples[0]
@@ -133,16 +131,16 @@ class Previewer {
         const s = spawnSync(python, [path.join(this.#extensionPath, "src", "preview", "renderer.py"), JSON.stringify({ style: f.name, ...panel.state, baseDir: path.join(this.#extensionPath, "matplotlib") })])
         f.removeCallback()
         if (s.error) {
-            await vscode.window.showErrorMessage(`mplstyle: ${s.error}`)
+            this.#logger.error(`${s.error}`)
             return
         }
         if (s.status !== 0) {
-            await vscode.window.showErrorMessage(`mplstyle: status code ${s.status}: ${s.stderr}`)
+            this.#logger.error(`status code ${s.status}: ${s.stderr}`)
             return
         }
         const output = jsonParse(s.stdout)
         if (output instanceof Error || typeof output !== "object" || output === null) {
-            await vscode.window.showErrorMessage(`mplstyle: Parse error: ${s.stdout}`)
+            this.#logger.error(`Parse error: ${s.stdout}`)
             return
         }
 

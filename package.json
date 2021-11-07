@@ -101,7 +101,7 @@
 	"scripts": {
 		"prepare": "python3 scripts/generate_documentation_images.py && npm i @vscode/webview-ui-toolkit@0.8.2 --prefix webview-ui-toolkit && cp webview-ui-toolkit/node_modules/@vscode/webview-ui-toolkit/dist/toolkit.min.js src/preview/webview-ui-toolkit.min.js && rimraf webview-ui-toolkit",
 		"vscode:prepublish": "python3 scripts/generate_documentation_images.py",
-		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js' --exclude 'src/preview/*.js'"
+		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js' --exclude 'src/preview/*.js' --exclude 'src/logger.js'"
 	},
 	"dependencies": {
 		"@vscode/codicons": "^0.0.26",

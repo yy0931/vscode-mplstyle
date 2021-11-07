@@ -6,6 +6,7 @@ const mplstyleParser = require("./mplstyle_parser")
 const json5 = require('json5')
 const rcParamsParser = require("./rc_params_parser")
 const preview = require("./preview/main_process")
+const Logger = require("./logger")
 
 const json5Parse = (/** @type {string} */text) => {
     try {
@@ -76,20 +77,13 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
         (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
 }
 
-/** @type {<T>(f: () => Promise<T>) => Promise<T | undefined>} */
-const showError = async (f) => {
-    try {
-        return f()
-    } catch (err) {
-        await vscode.window.showErrorMessage(`mplstyle: ${err}`)
-        console.error(err)
-    }
-}
-
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
+    const logger = new Logger()
+    logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
+
     let mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
     for (const err of mpl.errors) {
-        vscode.window.showErrorMessage(`mplstyle: ${err}.`)
+        logger.error(err)
     }
 
     const documentations = {
@@ -159,29 +153,29 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         )
     }
 
-
     context.subscriptions.push(
+        logger,
         diagnosticCollection,
-        new preview.Previewer(context.extensionUri, context.extensionPath),
-        vscode.window.onDidChangeActiveTextEditor(() => { diagnose() }),
-        vscode.window.onDidChangeTextEditorOptions(() => { diagnose() }),
-        vscode.workspace.onDidOpenTextDocument(() => { diagnose() }),
-        vscode.workspace.onDidChangeConfiguration(() => { diagnose() }),
-        vscode.workspace.onDidChangeTextDocument(() => { diagnose() }),
-        vscode.workspace.onDidCloseTextDocument((document) => { diagnosticCollection.delete(document.uri) }),
+        new preview.Previewer(context.extensionUri, context.extensionPath, logger),
+        vscode.window.onDidChangeActiveTextEditor(() => logger.trySync(() => { diagnose() })),
+        vscode.window.onDidChangeTextEditorOptions(() => logger.trySync(() => { diagnose() })),
+        vscode.workspace.onDidOpenTextDocument(() => logger.trySync(() => { diagnose() })),
+        vscode.workspace.onDidChangeConfiguration(() => logger.trySync(() => { diagnose() })),
+        vscode.workspace.onDidChangeTextDocument(() => logger.trySync(() => { diagnose() })),
+        vscode.workspace.onDidCloseTextDocument((document) => logger.trySync(() => { diagnosticCollection.delete(document.uri) })),
 
-        vscode.workspace.onDidChangeConfiguration((ev) => {
+        vscode.workspace.onDidChangeConfiguration((ev) => logger.trySync(() => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
                 mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
                 for (const err of mpl.errors) {
-                    vscode.window.showErrorMessage(`mplstyle: ${err}.`)
+                    logger.error(err)
                 }
             }
-        }),
+        })),
 
         vscode.languages.registerHoverProvider({ language: "python" }, {
             provideHover(document, position) {
-                try {
+                return logger.trySync(() => {
                     for (const { index, key } of rcParamsParser.findRcParams(document.lineAt(position.line).text)) {
                         if (index <= position.character && position.character < index + key.length) {
                             const type = mpl.params.get(key)
@@ -190,16 +184,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             return new vscode.Hover(detail.md.appendMarkdown(documentation.value), new vscode.Range(position.line, index, position.line, index + key.length))
                         }
                     }
-                } catch (err) {
-                    console.error(err)
-                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
-                }
+                })
             }
         }),
 
         vscode.languages.registerHoverProvider({ language: "mplstyle" }, {
-            async provideHover(document, position) {
-                return showError(async () => {
+            provideHover(document, position) {
+                return logger.trySync(() => {
                     const line = mplstyleParser.parseLine(document.lineAt(position.line).text)
                     if (line === null) { return }
 
@@ -229,7 +220,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
         vscode.languages.registerCompletionItemProvider({ language: "python" }, {
             provideCompletionItems(document, position) {
-                try {
+                return logger.trySync(() => {
                     for (const match of rcParamsParser.findRcParams(document.lineAt(position.line).text)) {
                         if (!(match.index <= position.character && position.character <= match.index + match.key.length)) { continue }
                         const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get("showComparisonImage") ?? true
@@ -242,16 +233,13 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             return item
                         })
                     }
-                } catch (err) {
-                    vscode.window.showErrorMessage(`mplstyle: ${err}`)
-                    console.error(err)
-                }
+                })
             }
         }, `"`, `'`),
 
         vscode.languages.registerCompletionItemProvider({ language: "mplstyle" }, {
-            async provideCompletionItems(document, position) {
-                return showError(async () => {
+            provideCompletionItems(document, position) {
+                return logger.trySync(() => {
                     const textLine = document.lineAt(position.line)
                     if (textLine.text.slice(0, position.character).includes(":")) {
                         // Value
@@ -313,8 +301,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         }),
 
         vscode.languages.registerSignatureHelpProvider({ language: 'mplstyle' }, {
-            async provideSignatureHelp(document, position) {
-                return showError(async () => {
+            provideSignatureHelp(document, position) {
+                return logger.trySync(() => {
                     const textLine = document.lineAt(position.line)
                     const pair = mplstyleParser.parseLine(textLine.text)
                     if (pair === null || pair.value === null) { return }
@@ -361,8 +349,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         }, "(", ",", "="),
 
         vscode.languages.registerColorProvider({ language: "mplstyle" }, {
-            async provideDocumentColors(document) {
-                return showError(async () => {
+            provideDocumentColors(document) {
+                return logger.trySync(() => {
                     /** @type {vscode.ColorInformation[]} */
                     const result = []
                     for (const { pair, line } of Array.from(mplstyleParser.parseAll(document.getText()).rc.values()).flat()) {
@@ -394,16 +382,18 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 })
             },
             provideColorPresentations(color, ctx) {
-                return [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))]
+                return logger.trySync(() => [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))])
             }
         }),
         vscode.languages.registerCodeLensProvider({ language: "mplstyle" }, {
             provideCodeLenses(document) {
-                if (vscode.workspace.getConfiguration("mplstyle").get("showPreviewButton")) {
-                    return [new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), { command: "mplstyle.preview", title: "mplstyle: Preview" })]
-                } else {
-                    return []
-                }
+                return logger.trySync(() => {
+                    if (vscode.workspace.getConfiguration("mplstyle").get("showPreviewButton")) {
+                        return [new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), { command: "mplstyle.preview", title: "mplstyle: Preview" })]
+                    } else {
+                        return []
+                    }
+                })
             }
         })
     )
