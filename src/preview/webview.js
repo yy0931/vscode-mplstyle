@@ -17,6 +17,7 @@ const updateDOM = () => {
             return
         }
 
+        get("#svg-container").classList.add("loaded")
         get("#svg").innerHTML = data.svg ?? ""
         get("#error").innerText = data.error ?? ""
         get("#version").innerText = data.version ?? ""
@@ -46,6 +47,9 @@ window.addEventListener("message", (/** @type {{ data: import("./main_process").
 })
 
 window.addEventListener("load", () => {
-    examples.addEventListener("change", (ev) => { vscodePostMessage({ example: examples.value }) })
+    examples.addEventListener("change", (ev) => {
+        get("#svg-container").classList.remove("loaded")
+        vscodePostMessage({ example: examples.value })
+    })
     get("#view-source").addEventListener("click", () => { vscodePostMessage({ viewSource: true }) })
 })

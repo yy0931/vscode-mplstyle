@@ -34,6 +34,23 @@ section {
     max-width: 100%;
     height: auto;
 }
+#svg-container > vscode-progress-ring {
+    position: absolute;
+    left: 10px;
+    top: 10px;
+}
+#svg-container.loaded > vscode-progress-ring {
+    display: none;
+}
+#svg-container {
+    position: relative;
+}
+#svg-container > #svg {
+    filter: brightness(0.8);
+}
+#svg-container.loaded > #svg {
+    filter: none;
+}
     </style>
     <link href="{{codicons}}" rel="stylesheet" />
     <script type="module" src="{{webviewUIToolkit}}"></script>
@@ -45,7 +62,10 @@ section {
         <vscode-button id="view-source">View Source</vscode-button>
     </section>
 
-    <section id="svg" class="checkered"></section>
+    <div id="svg-container" class="loaded">
+        <vscode-progress-ring></vscode-progress-ring>
+        <section id="svg" class="checkered"></section>
+    </div>
     <section id="error"></section>
     <section id="version"></section>
     <script type="module" src="{{webview.js}}"></script>
