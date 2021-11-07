@@ -75,6 +75,15 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
 }
 
 const readFile = async (/** @type {vscode.Uri} */ filepath) => vscode.workspace.fs.readFile(filepath).then((v) => new TextDecoder().decode(v))
+const isNOENT = (/** @type {unknown} */ err) => err instanceof vscode.FileSystemError && ["FileNotFound", "FileIsADirectory", "NoPermissions"].includes(err.code)
+
+const getMatplotlibPathConfig = () => {
+    const value = vscode.workspace.getConfiguration("mplstyle").get("hover.matplotlibPath")
+    if (value === undefined || value === "") {
+        return undefined
+    }
+    return vscode.Uri.file(value)
+}
 
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     if (!(await vscode.commands.getCommands()).includes("mplstyle.preview")) {
@@ -86,7 +95,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     const logger = new Logger()
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
 
-    let mpl = await parseMplSource(context.extensionUri, vscode.workspace.getConfiguration("mplstyle").get("hover.matplotlibPath"), vscode.Uri.joinPath, readFile)
+    let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT)
     for (const err of mpl.errors) {
         logger.error(err)
     }
@@ -170,7 +179,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
         vscode.workspace.onDidChangeConfiguration(async (ev) => logger.try(async () => {
             if (ev.affectsConfiguration("mplstyle.hover.matplotlibPath")) {
-                mpl = await parseMplSource(context.extensionUri, vscode.workspace.getConfiguration("mplstyle").get("hover.matplotlibPath"), vscode.Uri.joinPath, readFile)
+                mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT)
                 for (const err of mpl.errors) {
                     logger.error(err)
                 }

@@ -5,11 +5,13 @@ const path = require("path")
 const readFile = async (/** @type {string} */ filepath) => fs.readFile(filepath).then((v) => v.toString())
 const parseMplSource = require("./mpl_source_parser")
 
+const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
+
 describe("parseMplSource", () => {
     /** @type {Awaited<ReturnType<typeof parseMplSource>>} */
     let data
     before(async () => {
-        data = await parseMplSource(path.join(__dirname, ".."), undefined, (a, b) => path.join(a, b), readFile)
+        data = await parseMplSource(path.join(__dirname, ".."), undefined, (a, b) => path.join(a, b), readFile, isNOENT)
     })
 
     it("no errors", () => {
@@ -43,7 +45,7 @@ describe("parseMplSource", () => {
             return
         }
         try {
-            const { documentation, params: signatures, errors } = await parseMplSource('err', path.join(matches[1], "matplotlib"), (a, b) => path.join(a, b), readFile)
+            const { documentation, params: signatures, errors } = await parseMplSource('err', path.join(matches[1], "matplotlib"), (a, b) => path.join(a, b), readFile, isNOENT)
             deepStrictEqual(errors, [])
             include(documentation.get("figure.subplot.right")?.comment, 'the right side of the subplots of the figure')
             strictEqual(signatures.has('font.family'), true)
@@ -54,6 +56,6 @@ describe("parseMplSource", () => {
         }
     })
     it("NOENT", async () => {
-        include((await parseMplSource(/** @type {string} */("noent"), undefined, (a, b) => path.join(a, b), readFile)).errors[0], 'does not exist')
+        include((await parseMplSource(/** @type {string} */("noent"), undefined, (a, b) => path.join(a, b), readFile, isNOENT)).errors[0], 'does not exist')
     })
 })
