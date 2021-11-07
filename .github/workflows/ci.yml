@@ -28,6 +28,9 @@ jobs:
           python3 ./scripts/dump_color_map.py
           git diff --name-only --exit-code matplotlib color_map.json
 
+      - name: Test webpack build
+        run: npm webpack
+
   test_example_scripts:
     runs-on: ubuntu-latest
     strategy:
