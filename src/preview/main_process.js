@@ -52,7 +52,7 @@ class Previewer {
 
         this.#subscriptions = [
             vscode.workspace.onDidSaveTextDocument((document) => logger.try(async () => {
-                if (vscode.workspace.getConfiguration("mplstyle").get("previewOnSave") || this.#panels.has(document.uri.toString())) {
+                if (vscode.workspace.getConfiguration("mplstyle").get("preview.activateOnSave") || this.#panels.has(document.uri.toString())) {
                     await this.render(document)
                 }
             })),
@@ -77,7 +77,18 @@ class Previewer {
                     }
                     await this.#initPanel({ panel, state: { example: state.example, uri: state.uri } }, editor.document)
                 }),
-            }))
+            })),
+            vscode.languages.registerCodeLensProvider({ language: "mplstyle" }, {
+                provideCodeLenses(document) {
+                    return logger.trySync(() => {
+                        if (vscode.workspace.getConfiguration("mplstyle").get("preview.codeLens.enabled")) {
+                            return [new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), { command: "mplstyle.preview", title: "mplstyle: Preview" })]
+                        } else {
+                            return []
+                        }
+                    })
+                }
+            }),
         ]
     }
     /** @returns {Promise<Panel>} */
@@ -113,9 +124,9 @@ class Previewer {
         if (document.languageId !== "mplstyle") { return }
 
         // Get a python executable
-        const python = /** @type {string | undefined} */(vscode.workspace.getConfiguration("mplstyle").get("pythonPath")) || findPythonExecutable()
+        const python = /** @type {string | undefined} */(vscode.workspace.getConfiguration("mplstyle").get("preview.pythonPath")) || findPythonExecutable()
         if (typeof python !== "string" || python === "") {
-            this.#logger.error("Could not find a Python executable. Specify the path to it in the `mplstyle.pythonPath` configuration if you have a Python executable.")
+            this.#logger.error("Could not find a Python executable. Specify the path to it in the `mplstyle.preview.pythonPath` configuration if you have a Python executable.")
             return
         }
 

@@ -14,3 +14,4 @@ example/**
 .nyc_output
 __pycache__/
 src/preview/webview-ui-toolkit.min.js
+browser/

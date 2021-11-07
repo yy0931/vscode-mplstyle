@@ -32,6 +32,7 @@
 		"onWebviewPanel:mplstylePreview"
 	],
 	"main": "./src/extension.js",
+	"browser": "./browser/extension.js",
 	"contributes": {
 		"languages": [
 			{
@@ -59,30 +60,46 @@
 			"type": "object",
 			"title": "mplstyle",
 			"properties": {
-				"mplstyle.matplotlibPath": {
+				"mplstyle.hover.matplotlibPath": {
 					"type": "string",
 					"default": "",
-					"description": "The installation directory of matplotlib used to generate the documentation, e.g. /home/foo/.local/lib/python3.10/site-packages/matplotlib. If it is an empty string, the data shipped with the extension will be used."
+					"description": "The installation directory of matplotlib used to generate the documentation, e.g. /home/foo/.local/lib/python3.10/site-packages/matplotlib. The data shipped with the extension will be used if the value is an empty string."
 				},
-				"mplstyle.showComparisonImage": {
+				"mplstyle.hover.showImages": {
 					"type": "boolean",
 					"default": true,
-					"description": "Controls whether to show comparison images in the hover"
+					"description": "Controls whether to show images in hover"
 				},
-				"mplstyle.pythonPath": {
+				"mplstyle.preview.pythonPath": {
 					"type": "string",
 					"default": "",
-					"description": "Path to the Python executable to display previews, e.g. /usr/bin/python3, defaults to the output of `which python3 || which py || which python`"
+					"description": "Path to the Python executable to display previews, e.g. /usr/bin/python3, defaults to the output of `which python3 || which py || which python` (Linux, Mac) or `where python3 || where py || where python` (Windows)"
 				},
-				"mplstyle.previewOnSave": {
+				"mplstyle.preview.activateOnSave": {
 					"type": "boolean",
 					"default": false,
-					"description": "Controls whether to show a preview on save"
+					"description": "Controls whether to show the preview panel on save"
 				},
-				"mplstyle.showPreviewButton": {
+				"mplstyle.preview.codeLens.enabled": {
 					"type": "boolean",
 					"default": true,
 					"description": "Controls whether to show a button to show previewer on the editor"
+				},
+
+				"mplstyle.matplotlibPath": {
+					"deprecationMessage": "Use `mplstyle.hover.matplotlibPath` instead."
+				},
+				"mplstyle.showComparisonImage": {
+					"deprecationMessage": "Use `mplstyle.hover.showImages` instead."
+				},
+				"mplstyle.pythonPath": {
+					"deprecationMessage": "Use `mplstyle.preview.pythonPath` instead."
+				},
+				"mplstyle.previewOnSave": {
+					"deprecationMessage": "Use `mplstyle.preview.activateOnSave` instead."
+				},
+				"mplstyle.showPreviewButton": {
+					"deprecationMessage": "Use `mplstyle.preview.codeLens.enabled` instead."
 				}
 			}
 		},
@@ -100,9 +117,10 @@
 		}
 	},
 	"scripts": {
+		"webpack": "npx webpack",
 		"prepare": "python3 scripts/generate_documentation_images.py && npm i @vscode/webview-ui-toolkit@0.8.2 --prefix webview-ui-toolkit && cp webview-ui-toolkit/node_modules/@vscode/webview-ui-toolkit/dist/toolkit.min.js src/preview/webview-ui-toolkit.min.js && rimraf webview-ui-toolkit",
-		"vscode:prepublish": "python3 scripts/generate_documentation_images.py",
-		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension.js' --exclude 'src/preview/*.js' --exclude 'src/logger.js'"
+		"vscode:prepublish": "npm run webpack && python3 scripts/generate_documentation_images.py",
+		"test": "nyc mocha 'src/**/*.js' --exclude 'src/extension_*.js' --exclude 'src/preview/*.js' --exclude 'src/logger.js'"
 	},
 	"dependencies": {
 		"@vscode/codicons": "^0.0.26",
@@ -111,9 +129,17 @@
 		"which": "^2.0.2"
 	},
 	"devDependencies": {
+		"@types/chai": "^4.2.22",
+		"@types/mocha": "^9.0.0",
+		"@types/node": "^16.11.6",
+		"@types/vscode": "^1.53.0",
+		"@types/which": "^2.0.1",
 		"chai": "^4.3.4",
 		"mocha": "^9.1.3",
 		"nyc": "^15.1.0",
-		"rimraf": "^3.0.2"
+		"rimraf": "^3.0.2",
+		"terser-webpack-plugin": "^5.2.4",
+		"webpack": "^5.62.1",
+		"webpack-cli": "^4.9.1"
 	}
 }
