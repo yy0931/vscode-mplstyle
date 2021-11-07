@@ -35,7 +35,7 @@ const jsonParse = (/** @type {string} */text) => {
 }
 
 /** @typedef {{ svg: string, error: string, version: string, examples: string[], example: string, uri: string }} WebviewState */
-/** @typedef {{ example?: string, viewSource?: true }} WebviewMessage */
+/** @typedef {{ example?: string, viewSource?: true, log?: string, loaded?: true }} WebviewMessage */
 /** @typedef {{ panel: vscode.WebviewPanel, state: { example: string, uri: string } }} Panel */
 class Previewer {
     /** @readonly @type {Map<string, Panel>} */#panels
@@ -67,7 +67,7 @@ class Previewer {
                 })
             }),
             vscode.window.registerWebviewPanelSerializer("mplstylePreview", /** @type {vscode.WebviewPanelSerializer<WebviewState>} */({
-                deserializeWebviewPanel: async (panel, state) => this.#logger.trySync(() => {
+                deserializeWebviewPanel: async (panel, state) => this.#logger.try(async () => {
                     this.#logger.info(`deserializeWebviewPanel (title = ${panel.title}, uri = ${state.uri})`)
                     const editor = vscode.window.visibleTextEditors.find((editor) => editor.document.uri.toString() === state.uri.toString())
                     if (editor === undefined) {
@@ -75,33 +75,38 @@ class Previewer {
                         panel.dispose()
                         return
                     }
-                    this.#registerPanel({ panel, state: { example: state.example, uri: state.uri } }, editor.document)
+                    await this.#initPanel({ panel, state: { example: state.example, uri: state.uri } }, editor.document)
                 }),
             }))
         ]
     }
-    #registerPanel(/** @type {Panel} */panel, /** @type {vscode.TextDocument} */document) {
+    /** @returns {Promise<Panel>} */
+    async #initPanel(/** @type {Panel} */panel, /** @type {vscode.TextDocument} */document) {
         this.#panels.set(panel.state.uri.toString(), panel)
         panel.panel.onDidDispose(() => {
             this.#logger.info(`The panel for ${panel.state.uri} has been closed`)
             this.#panels.delete(panel.state.uri.toString())
         }, null, this.#subscriptions)
-        panel.panel.webview.onDidReceiveMessage((/** @type {WebviewMessage} */data) => this.#logger.try(async () => {
-            this.#logger.info(`Received a message ${JSON.stringify(data)} (uri = ${panel.state.uri})`)
-            if (data.example) {
-                panel.state.example = data.example
-                await this.render(document)
-            }
-            if (data.viewSource && panel.state.example !== "") {
-                await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + panel.state.example + ".py"), { })
-            }
-        }), null, this.#subscriptions)
-        panel.panel.webview.html = fs.readFileSync(path.join(this.#extensionPath, "src", "preview", "webview.html")).toString()
-            .replaceAll("{{cspSource}}", panel.panel.webview.cspSource)
-            .replaceAll("{{webviewUIToolkit}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview-ui-toolkit.min.js")).toString())
-            .replaceAll("{{webview.js}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview.js")).toString())
-            .replaceAll("{{codicons}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')).toString())
-        return panel
+        return new Promise((resolve) => {
+            panel.panel.webview.onDidReceiveMessage((/** @type {WebviewMessage} */data) => this.#logger.try(async () => {
+                this.#logger.info(`Received a message (uri = ${panel.state.uri}): ${JSON.stringify(data)}`)
+                if (data.example) {
+                    panel.state.example = data.example
+                    await this.render(document)
+                }
+                if (data.viewSource && panel.state.example !== "") {
+                    await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + panel.state.example + ".py"), { })
+                }
+                if (data.loaded) {
+                    resolve(panel)
+                }
+            }), null, this.#subscriptions)
+            panel.panel.webview.html = fs.readFileSync(path.join(this.#extensionPath, "src", "preview", "webview.html")).toString()
+                .replaceAll("{{cspSource}}", panel.panel.webview.cspSource)
+                .replaceAll("{{webviewUIToolkit}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview-ui-toolkit.min.js")).toString())
+                .replaceAll("{{webview.js}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview.js")).toString())
+                .replaceAll("{{codicons}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')).toString())
+        })
     }
     async render(/** @type {vscode.TextDocument} */document) {
         this.#logger.info(`Previewer.render (uri = ${document.uri}, languageId = ${document.languageId})`)
@@ -122,7 +127,7 @@ class Previewer {
         let panel = this.#panels.get(document.uri.toString())
         if (panel === undefined) {
             this.#logger.info(`The panel for ${document.uri} was not found, creating one`)
-            panel = this.#registerPanel({
+            panel = await this.#initPanel({
                 panel: vscode.window.createWebviewPanel("mplstylePreview", `Preview: ${path.basename(document.fileName)}`, {
                     viewColumn: vscode.ViewColumn.Beside,
                     preserveFocus: true,
