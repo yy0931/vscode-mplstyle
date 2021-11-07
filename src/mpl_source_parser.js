@@ -1,6 +1,5 @@
 const json5 = require("json5")
 const path = require("path")
-const fs = require("fs")
 const parseMatplotlibrc = require("./sample_matplotlibrc_parser")
 const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
 
@@ -469,7 +468,7 @@ if (testing) {
     })
 }
 
-const parseMplSource = (/** @type {string} */extensionPath, /** @type {unknown} */matplotlibPath) => {
+const parseMplSource = async (/** @type {string} */extensionPath, /** @type {unknown} */matplotlibPath, /** @type {(filepath: string) => Promise<string>} */readFile) => {
     // Read and parse matplotlib/rcsetup.py
     const useDefaultPath = matplotlibPath === undefined || typeof matplotlibPath !== "string" || matplotlibPath === ""
     const matplotlibDirectory = useDefaultPath ? path.join(extensionPath, "matplotlib") : matplotlibPath
@@ -477,11 +476,11 @@ const parseMplSource = (/** @type {string} */extensionPath, /** @type {unknown} 
     /** @type {string[]} */
     const errors = []
 
-    /** @returns {string} */
-    const readMatplotlibFile = (/** @type {string[]} */filepaths) => {
+    /** @returns {Promise<string>} */
+    const readMatplotlibFile = async (/** @type {string[]} */filepaths) => {
         for (const filepath of filepaths) {
             try {
-                return fs.readFileSync(path.join(matplotlibDirectory, filepath)).toString()
+                return await readFile(path.join(matplotlibDirectory, filepath))
             } catch (err) {
                 if (isNOENT(err)) {
                     continue
@@ -497,7 +496,7 @@ const parseMplSource = (/** @type {string} */extensionPath, /** @type {unknown} 
     }
 
     const withPrefix = (/** @type {string} */x) => [path.join(`lib/matplotlib/`, x), x]
-    const rcsetup = readMatplotlibFile(withPrefix("rcsetup.py"))
+    const rcsetup = await readMatplotlibFile(withPrefix("rcsetup.py"))
 
     const validators = parseDict(rcsetup, '_validators')
     errors.push(...validators[1].map((v) => `Error during parsing rcsetup.py: ${v}`))
@@ -515,7 +514,7 @@ const parseMplSource = (/** @type {string} */extensionPath, /** @type {unknown} 
     return {
         params: new Map(validators[0].map(({ key, value }) => [key, parseValidator(value)])),
         cyclerProps: new Map(propValidators[0].map(({ key, value }) => [key, parseValidator(value)])),
-        documentation: parseMatplotlibrc(readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))),
+        documentation: parseMatplotlibrc(await readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))),
         errors,
     }
 }
@@ -524,12 +523,14 @@ module.exports = parseMplSource
 if (testing) {
     const { assert: { deepStrictEqual, include, strictEqual, fail } } = require("chai")
     const { spawnSync } = require("child_process")
+    const fs = require("fs").promises
+    const readFile = async (/** @type {string} */ filepath) => fs.readFile(filepath).then((v) => v.toString())
 
     describe("parseMplSource", () => {
-        /** @type {ReturnType<typeof parseMplSource>} */
+        /** @type {Awaited<ReturnType<typeof parseMplSource>>} */
         let data
-        before(() => {
-            data = parseMplSource(path.join(__dirname, ".."), undefined)
+        before(async () => {
+            data = await parseMplSource(path.join(__dirname, ".."), undefined, readFile)
         })
 
         it("no errors", () => {
@@ -548,7 +549,7 @@ if (testing) {
             strictEqual(data.params.get('legend.fontsize')?.label, `"xx-small" | "x-small" | "small" | "medium" | "large" | "x-large" | "xx-large" | "smaller" | "larger" | float`)
         })
 
-        it("custom path", function () {
+        it("custom path", async function () {
             this.timeout(20 * 1000)
             const { status, stdout, stderr, error } = spawnSync(`pip3 show matplotlib`, { shell: true })
             if (error !== undefined) {
@@ -563,7 +564,7 @@ if (testing) {
                 return
             }
             try {
-                const { documentation, params: signatures, errors } = parseMplSource('err', path.join(matches[1], "matplotlib"))
+                const { documentation, params: signatures, errors } = await parseMplSource('err', path.join(matches[1], "matplotlib"), readFile)
                 deepStrictEqual(errors, [])
                 include(documentation.get("figure.subplot.right")?.comment, 'the right side of the subplots of the figure')
                 strictEqual(signatures.has('font.family'), true)
@@ -573,8 +574,8 @@ if (testing) {
                 throw err
             }
         })
-        it("NOENT", () => {
-            include(parseMplSource("noent").errors[0], 'does not exist')
+        it("NOENT", async () => {
+            include((await parseMplSource("noent", undefined, readFile)).errors[0], 'does not exist')
         })
     })
 }

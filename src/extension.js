@@ -1,4 +1,3 @@
-const fs = require("fs")
 const vscode = require("vscode")
 const path = require("path")
 const parseMplSource = require("./mpl_source_parser")
@@ -77,17 +76,19 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
         (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
 }
 
+const readFile = async (/** @type {string} */ filepath) => vscode.workspace.fs.readFile(vscode.Uri.file(filepath)).then((v) => v.toString())
+
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     const logger = new Logger()
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
 
-    let mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+    let mpl = await parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"), readFile)
     for (const err of mpl.errors) {
         logger.error(err)
     }
 
     const documentations = {
-        key: (/** @type {string} */text, /** @type {parseMplSource.Type} */type, /** @type {boolean} */showComparisonImage, /** @type {Map<string, string>} */images, /** @type {ReturnType<typeof parseMplSource>} */mpl) => {
+        key: (/** @type {string} */text, /** @type {parseMplSource.Type} */type, /** @type {boolean} */showComparisonImage, /** @type {Map<string, string>} */images, /** @type {Awaited<ReturnType<typeof parseMplSource>>} */mpl) => {
             const documentation = new vscode.MarkdownString()
             const image = images.get(text)
             if (showComparisonImage && image !== undefined) {
@@ -118,12 +119,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
-    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse(fs.readFileSync(path.join(context.extensionPath, "color_map.json")).toString()))))
+    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse((await vscode.workspace.fs.readFile(vscode.Uri.file(path.join(context.extensionPath, "color_map.json")))).toString()))))
 
     const imageDir = path.join(context.extensionPath, "example")
-    const images = new Map(fs.readdirSync(imageDir)
-        .filter((v) => v.endsWith(".png"))
-        .map((v) => [v.slice(0, -".png".length), vscode.Uri.file(path.join(imageDir, v)).toString()]))
+    const images = new Map((await vscode.workspace.fs.readDirectory(vscode.Uri.file(imageDir)))
+        .filter(([v, _]) => v.endsWith(".png"))
+        .map(([v, _]) => [v.slice(0, -".png".length), vscode.Uri.file(path.join(imageDir, v)).toString()]))
 
     const diagnose = () => {
         const editor = vscode.window.activeTextEditor
@@ -164,9 +165,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         vscode.workspace.onDidChangeTextDocument(() => logger.trySync(() => { diagnose() })),
         vscode.workspace.onDidCloseTextDocument((document) => logger.trySync(() => { diagnosticCollection.delete(document.uri) })),
 
-        vscode.workspace.onDidChangeConfiguration((ev) => logger.trySync(() => {
+        vscode.workspace.onDidChangeConfiguration(async (ev) => logger.try(async () => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
-                mpl = parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"))
+                mpl = await parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"), readFile)
                 for (const err of mpl.errors) {
                     logger.error(err)
                 }

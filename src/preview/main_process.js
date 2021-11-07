@@ -95,7 +95,7 @@ class Previewer {
                     await this.render(document)
                 }
                 if (data.viewSource && panel.state.example !== "") {
-                    await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + panel.state.example + ".py"), { })
+                    await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + panel.state.example + ".py"), {})
                 }
                 if (data.loaded) {
                     resolve(panel)
@@ -149,9 +149,11 @@ class Previewer {
         }
 
         // Render the example
+        // @ts-ignore
         const f = tmp.fileSync({ postfix: '.mplstyle' })
         fs.writeFileSync(f.fd, document.getText())
         const s = spawnSync(python, [path.join(this.#extensionPath, "src", "preview", "renderer.py"), JSON.stringify({ style: f.name, ...panel.state, baseDir: path.join(this.#extensionPath, "matplotlib") })])
+        // @ts-ignore
         f.removeCallback()
         if (s.error) {
             this.#logger.error(`${s.error}`)
@@ -161,9 +163,9 @@ class Previewer {
             this.#logger.error(`status code ${s.status}: ${s.stderr}`)
             return
         }
-        const output = jsonParse(s.stdout)
+        const output = jsonParse(s.stdout.toString())
         if (output instanceof Error || typeof output !== "object" || output === null) {
-            this.#logger.error(`Parse error: ${s.stdout}`)
+            this.#logger.error(`Parse error: ${s.stdout.toString()}`)
             return
         }
 
