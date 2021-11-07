@@ -10,10 +10,9 @@ const get = (/** @type {string} */ selector) => {
 
 const examples = /** @type {HTMLElement & { value: string }} */(get("#examples"))
 
-/** @typedef {{ svg?: string, error?: string, version?: string, examples?: string[], example?: string }} Data */
 const updateDOM = () => {
     try {
-        const data = /** @type {Data | undefined} */(vscode.getState())
+        const data = /** @type {import("./main_process").WebviewState | undefined} */(vscode.getState())
         if (data === undefined) {
             return
         }
@@ -38,16 +37,15 @@ const updateDOM = () => {
 
 updateDOM()
 
-window.addEventListener("message", ({ data }) => {
-    vscode.setState(data)
+const vscodeSetState = (/** @type {import("./main_process").WebviewState} */ state) => vscode.setState(state)
+const vscodePostMessage = (/** @type {import("./main_process").WebviewMessage} */ delta) => vscode.postMessage(delta)
+
+window.addEventListener("message", (/** @type {{ data: import("./main_process").WebviewState }} */{ data }) => {
+    vscodeSetState(data)
     updateDOM()
 })
 
 window.addEventListener("load", () => {
-    examples.addEventListener("change", (ev) => {
-        vscode.postMessage({ example: examples.value })
-    })
-    get("#view-source").addEventListener("click", () => {
-        vscode.postMessage({ viewSource: true })
-    })
+    examples.addEventListener("change", (ev) => { vscodePostMessage({ example: examples.value }) })
+    get("#view-source").addEventListener("click", () => { vscodePostMessage({ viewSource: true }) })
 })

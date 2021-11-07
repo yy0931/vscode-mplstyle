@@ -28,7 +28,8 @@
 	],
 	"activationEvents": [
 		"onLanguage:mplstyle",
-		"onLanguage:python"
+		"onLanguage:python",
+		"onWebviewPanel:mplstylePreview"
 	],
 	"main": "./src/extension.js",
 	"contributes": {
