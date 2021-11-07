@@ -29,7 +29,7 @@ jobs:
           git diff --name-only --exit-code matplotlib color_map.json
 
       - name: Test webpack build
-        run: npm webpack
+        run: npm run webpack
 
   test_example_scripts:
     runs-on: ubuntu-latest
