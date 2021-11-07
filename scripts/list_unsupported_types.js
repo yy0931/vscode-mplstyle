@@ -1,5 +1,5 @@
 const parseMplSource = require('../src/mpl_source_parser')
-const path = require('path')
+const path = require("path")
 const fs = require("fs").promises
 
 const main = async () => {

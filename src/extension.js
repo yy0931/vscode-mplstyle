@@ -1,5 +1,4 @@
 const vscode = require("vscode")
-const path = require("path")
 const parseMplSource = require("./mpl_source_parser")
 const mplstyleParser = require("./mplstyle_parser")
 const json5 = require('json5')
@@ -76,13 +75,13 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
         (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
 }
 
-const readFile = async (/** @type {string} */ filepath) => vscode.workspace.fs.readFile(vscode.Uri.file(filepath)).then((v) => v.toString())
+const readFile = async (/** @type {vscode.Uri} */ filepath) => vscode.workspace.fs.readFile(filepath).then((v) => v.toString())
 
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     const logger = new Logger()
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
 
-    let mpl = await parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"), readFile)
+    let mpl = await parseMplSource(context.extensionUri, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"), vscode.Uri.joinPath, readFile)
     for (const err of mpl.errors) {
         logger.error(err)
     }
@@ -119,12 +118,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
-    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse((await vscode.workspace.fs.readFile(vscode.Uri.file(path.join(context.extensionPath, "color_map.json")))).toString()))))
+    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse((await vscode.workspace.fs.readFile(vscode.Uri.joinPath(context.extensionUri, "color_map.json"))).toString()))))
 
-    const imageDir = path.join(context.extensionPath, "example")
-    const images = new Map((await vscode.workspace.fs.readDirectory(vscode.Uri.file(imageDir)))
+    const imageDir = vscode.Uri.joinPath(context.extensionUri, "example")
+    const images = new Map((await vscode.workspace.fs.readDirectory(imageDir))
         .filter(([v, _]) => v.endsWith(".png"))
-        .map(([v, _]) => [v.slice(0, -".png".length), vscode.Uri.file(path.join(imageDir, v)).toString()]))
+        .map(([v, _]) => [v.slice(0, -".png".length), vscode.Uri.joinPath(imageDir, v).toString()]))
 
     const diagnose = () => {
         const editor = vscode.window.activeTextEditor
@@ -167,7 +166,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
         vscode.workspace.onDidChangeConfiguration(async (ev) => logger.try(async () => {
             if (ev.affectsConfiguration("mplstyle.matplotlibPath")) {
-                mpl = await parseMplSource(context.extensionPath, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"), readFile)
+                mpl = await parseMplSource(context.extensionUri, vscode.workspace.getConfiguration("mplstyle").get("matplotlibPath"), vscode.Uri.joinPath, readFile)
                 for (const err of mpl.errors) {
                     logger.error(err)
                 }
