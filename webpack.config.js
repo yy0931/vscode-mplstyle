@@ -21,4 +21,4 @@ module.exports = {
     optimization: {
         minimizer: [new TerserPlugin({ extractComments: false })]
     }
-};
+}

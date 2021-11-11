@@ -377,8 +377,6 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                                 result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), new vscode.Color(...color)))
                             }
                         } else if (type.label === "cycler") {
-                            /** @type {RegExpExecArray | null} */
-                            let matches = null
                             // '0.40', 'E24A33', etc.
                             const pattern = /'(?:\w|\d|-|[.])*'|"(?:\w|\d|-|[.])*"/gi
                             for (const matches of pair.value.text.matchAll(pattern)) {
