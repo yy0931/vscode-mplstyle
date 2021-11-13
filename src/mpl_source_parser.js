@@ -226,7 +226,7 @@ const r = String.raw.bind(String)
  * @typedef {{ readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }} Type
  * @returns {Type}
  */
-const parseValidator = (/** @type {string} */source) => {
+const parseValidator = (/** @type {string} */source, /** @type {{ none: string, bool: string[] }} */keywords = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }) => {
     /** @type {(x: { readonly label: string, check: Type["check"] } & Partial<Type>) => Type} */
     const makeType = (x) => ({ constants: [], color: false, shortLabel: x.label, ...x })
 
@@ -266,10 +266,12 @@ const parseValidator = (/** @type {string} */source) => {
     if (matches = matchExpr(r`_?validate_(\w+)`, source)) {                 // validate_bool, validate_float, _validate_linestyle, _validate_pathlike, etc.
         const type = matches[1]
         if (type.endsWith("_or_None")) {
-            return orEnum(parseValidator(source.slice(0, -"_or_None".length)), ["none"])
+            // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L181
+            return orEnum(parseValidator(source.slice(0, -"_or_None".length)), [keywords.none])
         }
         if (type === "fontsize_None") {
-            return orEnum(parseValidator(source.slice(0, -"_None".length)), ["none"])
+            // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L354
+            return orEnum(parseValidator(source.slice(0, -"_None".length)), [keywords.none])
         }
         if (type.endsWith("list")) {
             // key: val1, val2
@@ -277,7 +279,6 @@ const parseValidator = (/** @type {string} */source) => {
         }
 
         // types
-        const boolKeywords = ["t", "y", "yes", "on", "true", "1", "f", "n", "no", "off", "false", "0"]
         switch (type) {
             case "linestyle":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L434-L434
@@ -301,7 +302,7 @@ const parseValidator = (/** @type {string} */source) => {
                 return makeType({ label: "int", check: (x) => { x = json5Parse(x); return typeof x === "number" && Number.isInteger(x) } })
             } case "bool":
                 // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L142-L142
-                return makeType({ label: "bool", check: (x) => boolKeywords.includes(x.toLowerCase()), constants: boolKeywords })
+                return makeType({ label: "bool", check: (x) => keywords.bool.map((v) => v.toLowerCase()).includes(x.toLowerCase()), constants: keywords.bool })
             case "string":
                 return makeType({ label: `str`, check: any })
             case "any":
@@ -352,7 +353,7 @@ const parseValidator = (/** @type {string} */source) => {
                 return { ...makeEnum(["full", "left", "right", "bottom", "top", "none"]), shortLabel: type }
             } case "sketch":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L534-L534
-                return makeType({ shortLabel: type, label: `list[float] (len=3) | "none"`, check: (x) => x.toLowerCase() === "none" || x.split(",").length === 3 && x.split(",").map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number") })
+                return makeType({ shortLabel: type, label: `list[float] (len=3) | "${keywords.none}"`, check: (x) => x.toLowerCase() === "none" || x.split(",").length === 3 && x.split(",").map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number"), constants: [keywords.none] })
             case "hist_bins": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L766-L766
                 const values = ["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"]
@@ -466,8 +467,8 @@ if (testing) {
     })
 }
 
-/** @type {<Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean) => Promise<{ params: Map<string, Type>, cyclerProps: Map<string, Type>, documentation: Map<string, { exampleValue: string; comment: string }>, errors: string[] }>} */
-const parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile, isNOENT) => {
+/** @type {<Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, keywords?: { none: string, bool: string[] }) => Promise<{ params: Map<string, Type>, cyclerProps: Map<string, Type>, documentation: Map<string, { exampleValue: string; comment: string }>, errors: string[] }>} */
+const parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile, isNOENT, keywords) => {
     // Read and parse matplotlib/rcsetup.py
     const useDefaultPath = !matplotlibPath
     const matplotlibDirectory = useDefaultPath ? joinPaths(extensionPath, "matplotlib") : matplotlibPath
@@ -513,8 +514,8 @@ const parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile
         }
     }
 
-    const params = new Map(validators[0].map(({ key, value }) => [key, parseValidator(value)]))
-    const cyclerProps = new Map(propValidators[0].map(({ key, value }) => [key, parseValidator(value)]))
+    const params = new Map(validators[0].map(({ key, value }) => [key, parseValidator(value, keywords)]))
+    const cyclerProps = new Map(propValidators[0].map(({ key, value }) => [key, parseValidator(value, keywords)]))
 
     const matplotlibrc = await readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))
     if ("err" in matplotlibrc) {

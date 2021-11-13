@@ -85,6 +85,20 @@
 					"default": true,
 					"description": "Controls whether to show a button to show previewer on the editor"
 				},
+				"mplstyle.completion.keywords.bool": {
+					"type": "array",
+					"items": {
+						"type": "string",
+						"minLength": 1
+					},
+					"uniqueItems": true,
+					"default": ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"]
+				},
+				"mplstyle.completion.keywords.none": {
+					"type": "string",
+					"default": "None",
+					"minLength": 1
+				},
 				"mplstyle.matplotlibPath": {
 					"deprecationMessage": "Use `mplstyle.hover.matplotlibPath` instead."
 				},

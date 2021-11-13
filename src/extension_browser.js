@@ -85,6 +85,13 @@ const getMatplotlibPathConfig = () => {
     return vscode.Uri.file(value)
 }
 
+/** @returns {{ none: string, bool: string[] }} */
+const getKeywords = () => {
+    const none = vscode.workspace.getConfiguration("mplstyle").get("completion.keywords.none")
+    const bool = vscode.workspace.getConfiguration("mplstyle").get("completion.keywords.bool")
+    return { none, bool }
+}
+
 exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     if (!(await vscode.commands.getCommands()).includes("mplstyle.preview")) {
         context.subscriptions.push(vscode.commands.registerCommand("mplstyle.preview", () => logger.try(async () => {
@@ -96,7 +103,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
     logger.info(`extensionUri: ${context.extensionUri}`)
 
-    let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT)
+    let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
     for (const err of mpl.errors) {
         logger.error(err)
     }
@@ -180,8 +187,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         vscode.workspace.onDidCloseTextDocument((document) => logger.trySync(() => { diagnosticCollection.delete(document.uri) })),
 
         vscode.workspace.onDidChangeConfiguration(async (ev) => logger.try(async () => {
-            if (ev.affectsConfiguration("mplstyle.hover.matplotlibPath")) {
-                mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT)
+            if (ev.affectsConfiguration("mplstyle.hover.matplotlibPath") || ev.affectsConfiguration("mplstyle.completion.keywords")) {
+
+                mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
                 for (const err of mpl.errors) {
                     logger.error(err)
                 }
