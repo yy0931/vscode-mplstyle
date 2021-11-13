@@ -98,21 +98,6 @@
 					"type": "string",
 					"default": "None",
 					"minLength": 1
-				},
-				"mplstyle.matplotlibPath": {
-					"deprecationMessage": "Use `mplstyle.hover.matplotlibPath` instead."
-				},
-				"mplstyle.showComparisonImage": {
-					"deprecationMessage": "Use `mplstyle.hover.showImages` instead."
-				},
-				"mplstyle.pythonPath": {
-					"deprecationMessage": "Use `mplstyle.preview.pythonPath` instead."
-				},
-				"mplstyle.previewOnSave": {
-					"deprecationMessage": "Use `mplstyle.preview.activateOnSave` instead."
-				},
-				"mplstyle.showPreviewButton": {
-					"deprecationMessage": "Use `mplstyle.preview.codeLens.enabled` instead."
 				}
 			}
 		},
