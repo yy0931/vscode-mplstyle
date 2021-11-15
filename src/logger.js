@@ -33,7 +33,7 @@ class Logger {
             }
             return out
         } catch (err) {
-            this.error(err)
+            this.error(err instanceof Error ? err : err + "")
         }
     }
 
