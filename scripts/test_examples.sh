@@ -7,7 +7,7 @@ for f in matplotlib/examples/*.py; do
     basename_without_extension="${without_extension##*/}"
 
     echo "testing $basename_without_extension"
-    err=$(python3 src/preview/renderer.py "{ \"style\": \"ggplot\", \"baseDir\": \"matplotlib\", \"example\": \"$basename_without_extension\" }" | jq .error)
+    err=$(python3 src/preview/renderer.py "{ \"style\": \"ggplot\", \"activePlot\": { \"path\": \"matplotlib/examples/$basename_without_extension\" } }" | jq .error)
     if [ "$err" != '""' ]; then
         echo "$err"
         exit 1

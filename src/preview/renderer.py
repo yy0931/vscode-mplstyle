@@ -19,6 +19,7 @@ try:
 
     import importlib
     import sys
+    from pathlib import Path
 
     import matplotlib
     import matplotlib.pyplot as plt
@@ -32,8 +33,9 @@ try:
     # Plot figures
     args = json.loads(sys.argv[1])
     plt.style.use(args["style"])
-    sys.path.append(args["baseDir"])
-    importlib.import_module(f"examples.{args['example']}")
+    path = Path(args['activePlot']['path'])
+    sys.path.append(str(path.parent))
+    importlib.import_module(path.with_suffix("").name)
 
     # Output the result to stdout in JSON format
     print(json.dumps({

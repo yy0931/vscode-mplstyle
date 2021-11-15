@@ -33,11 +33,7 @@ class Logger {
             }
             return out
         } catch (err) {
-            if (err instanceof Error && err.stack !== undefined) {
-                this.error(err.stack)
-            } else {
-                this.error(err + "")
-            }
+            this.error(err)
         }
     }
 
@@ -47,7 +43,10 @@ class Logger {
     warning(/** @type {string} */message) {
         this.#outputChannel.appendLine(`[Warning]${message}`)
     }
-    error(/** @type {string} */message) {
+    error(/** @type {string | Error} */message) {
+        if (message instanceof Error && message.stack !== undefined) {
+            message = message.stack
+        }
         this.#outputChannel.appendLine(`[Error] ${message}`)
         vscode.window.showErrorMessage(`mplstyle: ${message}`)
     }

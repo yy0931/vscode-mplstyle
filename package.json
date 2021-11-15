@@ -85,6 +85,15 @@
 					"default": true,
 					"description": "Controls whether to show a button to show previewer on the editor"
 				},
+				"mplstyle.preview.userPlots": {
+					"type": "array",
+					"default": [],
+					"uniqueItems": true,
+					"items": {
+						"type": "string"
+					},
+					"markdownDescription": "Adds Python scripts that can be used in the previewer, e.g. `[\"/home/foo/plot1.py\", \"/home/foo/plot2.py\"]`"
+				},
 				"mplstyle.completion.keywords.bool": {
 					"type": "array",
 					"items": {

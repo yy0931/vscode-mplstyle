@@ -1,5 +1,6 @@
 // @ts-ignore
 const vscode = acquireVsCodeApi()
+const vscodeGetState = () => /** @type {import("./main_process").WebviewState | undefined} */(vscode.getState())
 const vscodeSetState = (/** @type {import("./main_process").WebviewState} */ state) => vscode.setState(state)
 const vscodePostMessage = (/** @type {import("./main_process").WebviewMessage} */ delta) => vscode.postMessage(delta)
 
@@ -17,23 +18,23 @@ try {
 
     const updateDOM = () => {
         try {
-            const data = /** @type {import("./main_process").WebviewState | undefined} */(vscode.getState())
+            const data = vscodeGetState()
             if (data === undefined) {
                 return
             }
-            vscodePostMessage({ log: `updateDOM (error = ${data.error}, example = ${data.example}, examples = ${data.examples}, svg.length = ${data.svg.length}, uri = ${data.uri}, version = ${data.version})` })
+            vscodePostMessage({ log: `updateDOM (error = ${data.error}, plot = ${data.activePlot}, plots = ${data.plots}, svg.length = ${data.svg?.length}, uri = ${data.uri}, version = ${data.version})` })
 
             get("#svg-container").classList.add("loaded")
             get("#svg").innerHTML = data.svg ?? ""
             get("#error").innerText = data.error ?? ""
             get("#version").innerText = data.version ?? ""
-            examples.replaceChildren(...(data.examples ?? []).map((v) => {
+            examples.replaceChildren(...(data.plots ?? []).map((v) => {
                 const option = /** @type {HTMLOptionElement} */(document.createElement(`vscode-option`))
-                option.setAttribute("value", v)
-                if (v === data.example) {
+                option.setAttribute("value", v.path)
+                if (v.path === data.activePlot.path) {
                     option.setAttribute("selected", "true")
                 }
-                option.innerText = v
+                option.innerText = v.label
                 return option
             }))
         } catch (err) {
@@ -56,10 +57,23 @@ try {
 
         examples.addEventListener("change", (ev) => {
             get("#svg-container").classList.remove("loaded")
-            vscodePostMessage({ log: "#examples.onchange", example: examples.value })
+            const state = vscodeGetState()
+            if (state === undefined) {
+                vscodePostMessage({ log: `ERROR: ${examples.value} is selected but state is undefined` })
+                return
+            }
+            const label = state.plots.find((v) => v.path === examples.value)?.label
+            if (label === undefined) {
+                vscodePostMessage({ log: `ERROR: path ${examples.value} was not found in "plots"` })
+                return
+            }
+            vscodePostMessage({ log: "#examples.onchange", activePlot: { label, path: examples.value } })
         })
         get("#view-source").addEventListener("click", () => {
             vscodePostMessage({ log: "#view-source.onclick", viewSource: true })
+        })
+        get("#edit").addEventListener("click", () => {
+            vscodePostMessage({ log: "#view-source.onclick", edit: true })
         })
     })
 
