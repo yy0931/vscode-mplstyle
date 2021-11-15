@@ -1,11 +1,12 @@
 const path = require("path")
 const TerserPlugin = require("terser-webpack-plugin")
+const webpack = require("webpack")
 
 /** @type {import("webpack").Configuration} */
 module.exports = {
     mode: "production",
     target: 'webworker',
-    entry: './src/extension_browser.js',
+    entry: './src/extension.js',
     output: {
         path: path.resolve(__dirname, 'browser'),
         filename: 'extension.js',
@@ -20,5 +21,12 @@ module.exports = {
     },
     optimization: {
         minimizer: [new TerserPlugin({ extractComments: false })]
-    }
+    },
+    plugins: [
+        new webpack.DefinePlugin({
+            'process.env': {
+                WEBPACKED: true,
+            }
+        }),
+    ]
 }
