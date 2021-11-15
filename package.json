@@ -92,7 +92,7 @@
 					"items": {
 						"type": "string"
 					},
-					"markdownDescription": "Adds Python scripts that can be used in the previewer, e.g. `[\"/home/foo/plot1.py\", \"/home/foo/plot2.py\"]`"
+					"markdownDescription": "Adds Python scripts that can be used in the previewer. Example: `[\"/home/foo/plot1.py\", \"/home/foo/plot2.py\"]`"
 				},
 				"mplstyle.completion.keywords.bool": {
 					"type": "array",
