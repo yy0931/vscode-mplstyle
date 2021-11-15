@@ -115,7 +115,11 @@ class Previewer {
                     await this.render(document)
                 }
                 if (data.viewSource && panel.state.activePlot) {
-                    await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + panel.state.activePlot.path), {})
+                    if (panel.state.activePlot.path.toString().startsWith(this.#extensionPath.toString())) {
+                        await vscode.window.showTextDocument(vscode.Uri.parse("mplstyle.example:" + panel.state.activePlot.path), {})
+                    } else {
+                        await vscode.window.showTextDocument(await vscode.workspace.openTextDocument(panel.state.activePlot.path))
+                    }
                 }
                 if (data.loaded) {
                     resolve(panel)
