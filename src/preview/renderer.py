@@ -30,6 +30,9 @@ try:
     plt.show = lambda *args, **kwargs: savefig(svg, format="svg")
     plt.savefig = lambda *args, **kwargs: None
 
+    # Disable plt.rcdefaults() because it exists in examples/barh.py
+    plt.rcdefaults = lambda *args, **kwargs: None
+
     # Plot figures
     args = json.loads(sys.argv[1])
     plt.style.use(args["style"])
