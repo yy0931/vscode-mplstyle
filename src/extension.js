@@ -144,7 +144,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
-    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse(await readFile(vscode.Uri.joinPath(context.extensionUri, "color_map.json"))))))
+    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(jsonParse(await readFile(vscode.Uri.joinPath(context.extensionUri, "matplotlib", "color_map.json"))))))
     logger.info(`The number of color names: ${colorMap.size}`)
 
     const imageDir = vscode.Uri.joinPath(context.extensionUri, "example")

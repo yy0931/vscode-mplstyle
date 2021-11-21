@@ -26,7 +26,7 @@ jobs:
         run: |
           ./scripts/update_matplotlib_source.sh
           python3 ./scripts/dump_color_map.py
-          git diff --name-only --exit-code matplotlib color_map.json
+          git diff --name-only --exit-code matplotlib
 
       - name: Test webpack build
         run: npm run webpack
