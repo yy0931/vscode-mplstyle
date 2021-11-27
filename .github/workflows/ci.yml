@@ -2,7 +2,7 @@ name: CI
 on:
   push:
   schedule:
-    - cron: 45 9 * * 6  # At 09:45 on Saturday
+    - cron: 1 2 3 * *  # run monthly
 jobs:
   test_language_features:
     runs-on: ubuntu-latest
