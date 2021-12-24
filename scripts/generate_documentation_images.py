@@ -28,6 +28,13 @@ def savefig(out_file: Path):
     plt.close()
 
 
+def plot_capstyle_simple(ax: Axes, title: str):
+    ax.plot([1, 2.5, 4], [0.4, 0, 0.3])
+    ax.set_xlabel('xlabel')
+    ax.set_ylabel('ylabel')
+    ax.set_title(title)
+
+
 def plot_axes_simple(ax: Axes, title: str):
     x1 = np.linspace(0.0, 5.0)
     y1 = np.cos(2 * np.pi * x1) * np.exp(-x1)
@@ -42,6 +49,16 @@ def plot_axes_legend(ax: Axes, title: str):
     for (n, marker) in ((1, "o"), (2, "^")):
         ax.plot(x, x**n, label="n={0}".format(n), marker=marker)
     ax.legend().set_title("legend title")
+    ax.set_xlabel('xlabel')
+    ax.set_ylabel('ylabel')
+    ax.set_title(title)
+
+
+def plot_axes_legend_col2(ax: Axes, title: str):
+    x = np.linspace(0, 1, num=8)
+    for (n, marker) in ((1, "o"), (2, "^")):
+        ax.plot(x, x**n, label="n={0}".format(n), marker=marker)
+    ax.legend(ncol=2).set_title("legend title")
     ax.set_xlabel('xlabel')
     ax.set_ylabel('ylabel')
     ax.set_title(title)
@@ -75,7 +92,6 @@ plt.style.use(Path(__file__).parent / 'default.mplstyle')
 
 todo = """
 axes.autolimit_mode: round_numbers
-axes.axisbelow: False
 axes.formatter.limits: -1, 1
 axes.formatter.min_exponent: 5
 axes.formatter.offset_threshold: 2
@@ -87,12 +103,8 @@ axes.zmargin: 0.3
 axes3d.grid: False
 polaraxes.grid: False
 lines.color: red
-lines.dash_capstyle: projecting
-lines.dash_joinstyle: bevel
 pcolor.shading: flat
 pcolormesh.snap: False
-lines.solid_capstyle: round
-lines.solid_joinstyle: miter
 """
 
 
@@ -109,12 +121,12 @@ def parse_config(config: str):
 
 
 for values in parse_config("""
-axes.edgecolor: green;axes.linewidth: 1.5
+axes.edgecolor: green; axes.linewidth: 1.5
 axes.facecolor: lightgreen
 axes.grid: True
-axes.grid.which: both;axes.grid: True;xtick.minor.visible: True
+axes.grid.which: both; axes.grid: True; xtick.minor.visible: True
 axes.labelcolor: green
-axes.labelpad: 10.0;axes.labelpad: 0
+axes.labelpad: 10.0; axes.labelpad: 0
 axes.labelsize: xx-small
 axes.labelweight: bold
 axes.linewidth: 5
@@ -128,7 +140,7 @@ axes.titlelocation: left
 axes.titlepad: 20.0
 axes.titlesize: xx-small
 axes.titleweight: bold
-axes.titley: 0.2;axes.titley: 1
+axes.titley: 0.2; axes.titley: 1
 axes.grid.axis: x; axes.grid: True
 axes.xmargin: 0.5
 axes.ymargin: 0.5
@@ -139,20 +151,27 @@ lines.dotted_pattern: 1, 4; lines.linestyle: dotted
 lines.linestyle: --
 lines.linewidth: 4.5
 lines.marker: o
-lines.markeredgecolor: lightgreen;lines.marker: o
-lines.markeredgewidth: 2.0;lines.marker: o;lines.markeredgecolor: lightgreen
-lines.markerfacecolor: lightgreen;lines.marker: o
-lines.markersize: 12;lines.marker: o
-lines.scale_dashes: False;lines.linestyle: dashed
-markers.fillstyle: bottom;lines.marker: o;lines.markeredgecolor: lightgreen
+lines.markeredgecolor: lightgreen; lines.marker: o
+lines.markeredgewidth: 2.0; lines.marker: o; lines.markeredgecolor: lightgreen
+lines.markerfacecolor: lightgreen; lines.marker: o
+lines.markersize: 12; lines.marker: o
+lines.scale_dashes: False; lines.linestyle: dashed
+markers.fillstyle: bottom; lines.marker: o; lines.markeredgecolor: lightgreen
 grid.linewidth: 4; axes.grid: True
 font.size: 15
+axes.axisbelow: False; axes.axisbelow: True; lines.linewidth: 5; grid.color: black; axes.grid: True
 """):
     render_figure(plot_axes_simple, *values[0], values[1:])
 
+for values in parse_config("""
+lines.solid_capstyle: round; lines.linewidth: 15; axes.xmargin: 0.5; axes.ymargin: 0.3
+lines.solid_joinstyle: miter; lines.linewidth: 15; axes.xmargin: 0.5; axes.ymargin: 0.3
+lines.dash_capstyle: round; lines.linestyle: dashed; lines.linewidth: 5; lines.linewidth: 10
+lines.dash_joinstyle: miter; lines.linestyle: dashed; lines.linewidth: 5; lines.linewidth: 10; axes.xmargin: 0.2; axes.ymargin: 0.3
+"""):
+    render_figure(plot_capstyle_simple, *values[0], values[1:])
+
 todo = """
-legend.columnspacing: 10
-legend.fancybox: False
 legend.scatterpoints: 2
 """
 
@@ -173,7 +192,13 @@ legend.handletextpad: 4
 legend.borderaxespad: 2.5
 legend.numpoints: 2
 legend.markerscale: 2.0
+legend.fancybox: False; legend.edgecolor: green
 """):
     render_figure(plot_axes_legend, *values[0], values[1:])
+
+for values in parse_config("""
+legend.columnspacing: 4
+"""):
+    render_figure(plot_axes_legend_col2, *values[0], values[1:])
 
 (out_dir / "index.txt").write_text("\n".join(f.name for f in out_dir.iterdir()))
