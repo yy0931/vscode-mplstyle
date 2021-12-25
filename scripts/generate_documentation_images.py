@@ -105,6 +105,13 @@ polaraxes.grid: False
 lines.color: red
 pcolor.shading: flat
 pcolormesh.snap: False
+xtick.major.top: False
+xtick.minor.pad: 6.8;      xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.size: 4;       xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.top: False;    xtick.minor.visible: True; ytick.minor.visible: True
+ytick.major.right: False
+ytick.minor.pad: 6.8;      xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.right: False;  xtick.minor.visible: True; ytick.minor.visible: True
 """
 
 
@@ -118,7 +125,6 @@ def parse_config(config: str):
             k, v = pair.split(":", 1)
             values.append((k.strip(), v.strip()))
         yield values
-
 
 for values in parse_config("""
 axes.edgecolor: green; axes.linewidth: 1.5
@@ -160,6 +166,39 @@ markers.fillstyle: bottom; lines.marker: o; lines.markeredgecolor: lightgreen
 grid.linewidth: 4; axes.grid: True
 font.size: 15
 axes.axisbelow: False; axes.axisbelow: True; lines.linewidth: 5; grid.color: black; axes.grid: True
+xtick.top: True
+ytick.left: False
+xtick.bottom: False
+ytick.right: True
+xtick.labeltop: True
+ytick.labelleft: False
+xtick.labelbottom: False
+ytick.labelright: True
+xtick.major.size: 14
+ytick.major.size: 14
+xtick.major.width: 5
+ytick.major.width: 5
+xtick.color: green
+ytick.color: green
+xtick.labelcolor: green
+ytick.labelcolor: green
+xtick.labelsize: xx-large
+ytick.labelsize: xx-large
+xtick.direction: in
+ytick.direction: in
+xtick.minor.visible: True
+ytick.minor.visible: True
+xtick.major.bottom: False
+xtick.alignment: left
+ytick.alignment: top
+xtick.major.pad: 15
+ytick.major.pad: 15
+ytick.major.left: False
+xtick.minor.bottom: False; xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.size: 4;       xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.width: 5;      xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.width: 5;      xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.left: False;   xtick.minor.visible: True; ytick.minor.visible: True
 """):
     render_figure(plot_axes_simple, *values[0], values[1:])
 
