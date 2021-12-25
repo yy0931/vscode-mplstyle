@@ -50,6 +50,11 @@
             "match": "(?i)\\b(?:t|y|yes|on|true|f|n|no|off|false|none)\\b"
         },
         {
+            "comment": "Date",
+            "name": "constant.numeric.mplstyle",
+            "match": "\\d{4}-\\d{2}-[0-9\\-A-Za-z:]+"
+        },
+        {
             "comment": "Numeric literals",
             "name": "constant.numeric.mplstyle",
             "match": "(?<=[^\\w])[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)\\b"
