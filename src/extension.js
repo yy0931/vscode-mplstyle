@@ -135,7 +135,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     // Value
                     const matches = /^\s*cycler\b/.exec(line.value.text)
                     if (matches !== null && line.value.start + matches.index <= position.character && position.character < line.value.start + matches.index + matches[0].length) {
-                        const cycler = documentationGenerator.cycler()
+                        const cycler = documentationGenerator.cycler(mpl)
                         return new vscode.Hover(
                             new vscode.MarkdownString()
                                 .appendCodeblock(`cycler(${cycler.detail.form2.param1}, ${cycler.detail.form2.param2})\ncycler(*, ${cycler.detail.form3.kwargs.join(", ")})`, 'python')
@@ -197,7 +197,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             const item = new vscode.CompletionItem('cycler', vscode.CompletionItemKind.Function)
                             item.insertText = new vscode.SnippetString("cycler(color=[${1}])")
                             item.command = { title: "Trigger Parameter Hints", command: "editor.action.triggerParameterHints" }
-                            item.documentation = new vscode.MarkdownString(documentationGenerator.cycler().documentation)
+                            item.documentation = new vscode.MarkdownString(documentationGenerator.cycler(mpl).documentation)
                             items.push(item)
                         } else {
                             items.push(...colors("'"))
@@ -241,7 +241,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 if (pair === null || pair.value === null) { return }
                 if (/^\s*cycler\b/.test(pair.value.text)) {
                     // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L618-L618
-                    const cycler = documentationGenerator.cycler()
+                    const cycler = documentationGenerator.cycler(mpl)
                     const form2 = new vscode.SignatureInformation(`cycler(${cycler.detail.form2.param1}, ${cycler.detail.form2.param2})`)
                     form2.parameters = [new vscode.ParameterInformation(cycler.detail.form2.param1), new vscode.ParameterInformation(cycler.detail.form2.param2)]
                     const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.detail.form3.kwargs.join(", ")})`)
