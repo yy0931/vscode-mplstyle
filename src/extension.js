@@ -2,6 +2,7 @@ const vscode = require("vscode")
 const { parseMplSource } = require("./documentation-generator/parse-rcsetup.py")
 const mplstyleParser = require("./parser")
 const Logger = require("./logger")
+const { formatLine } = require("./format")
 
 const toHex = (/** @type {readonly [number, number, number, number]} */color) => {
     return ("00" + Math.floor(color[0] * 255).toString(16).toUpperCase()).slice(-2) +
@@ -340,6 +341,32 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         },
         provideColorPresentations(color, ctx) {
             return logger.trySync(() => [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))])
+        }
+    }))
+
+    const mapEdits = (/** @type {ReturnType<typeof formatLine>} */ edits, /** @type {number} */line) => edits.map((v) => v.edit === "delete" ? vscode.TextEdit.delete(new vscode.Range(line, v.start, line, v.end)) : vscode.TextEdit.replace(new vscode.Range(line, v.start, line, v.end), v.replacement))
+    context.subscriptions.push(vscode.languages.registerOnTypeFormattingEditProvider({ language: "mplstyle" }, {
+        provideOnTypeFormattingEdits(document, position) {
+            return mapEdits(formatLine(document.lineAt(position.line).text), position.line)
+        }
+    }, ":"))
+    context.subscriptions.push(vscode.languages.registerDocumentRangeFormattingEditProvider({ language: "mplstyle" }, {
+        provideDocumentRangeFormattingEdits(document, range) {
+            const edits = []
+            for (let i = range.start.line; i <= range.end.line; i++) {
+                edits.push(...mapEdits(formatLine(document.lineAt(i).text), i))
+            }
+            return edits
+        }
+    }))
+    context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider({ language: "mplstyle" }, {
+        provideDocumentFormattingEdits(document) {
+            /** @type {vscode.TextEdit[]} */
+            const edits = []
+            for (let i = 0; i < document.lineCount; i++) {
+                edits.push(...mapEdits(formatLine(document.lineAt(i).text), i))
+            }
+            return edits
         }
     }))
 }
