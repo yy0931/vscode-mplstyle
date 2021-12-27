@@ -184,9 +184,10 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         item.detail = "constant"
                         return item
                     })
-                    const colors = (/** @type {string} */quotation) => Array.from(colorMap.entries()).map(([k, v]) => {
+                    const colors = (/** @type {string} */quotation, /** @type {vscode.Range | undefined} */range) => Array.from(colorMap.entries()).map(([k, v]) => {
                         const item = new vscode.CompletionItem(quotation + k + quotation, vscode.CompletionItemKind.Color)
                         item.detail = "#" + toHex(v)
+                        if (range !== undefined) { item.range = range }
                         return item
                     })
                     if (type.color) {
@@ -200,7 +201,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             item.documentation = new vscode.MarkdownString(documentationGenerator.cycler(mpl).documentation)
                             items.push(item)
                         } else {
-                            items.push(...colors("'"))
+                            const m = /['"][\w :]*$/.exec(textLine.text.slice(0, position.character))
+                            if (m === null) {
+                                items.push(...colors("'"))
+                            } else {
+                                items.push(...colors('', new vscode.Range(position.line, m.index + 1, position.line, position.character)))
+                            }
                         }
                     }
                     return items
