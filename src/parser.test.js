@@ -4,32 +4,37 @@ const path = require("path")
 const p = require("./parser")
 
 describe("parseLine", () => {
-    it("with a comment", () => {
-        deepStrictEqual(p.parseLine("  a:  b  # c"), {
-            key: { text: "a", start: 2, end: 3 },
-            value: { text: "b", start: 6, end: 7 },
-            commentStart: 9,
+    const test = (/** @type {string} */l, /** @type {ReturnType<typeof p.parseLine>} */r) => {
+        it(l, () => {
+            deepStrictEqual(p.parseLine(l), r)
         })
+    }
+    test("  a:  b  # c", {
+        key: { text: "a", start: 2, end: 3 },
+        value: { text: "b", start: 6, end: 7 },
+        commentStart: 9,
     })
-    it("without comments", () => {
-        deepStrictEqual(p.parseLine("  a:  b"), {
-            key: { text: "a", start: 2, end: 3 },
-            value: { text: "b", start: 6, end: 7 },
-            commentStart: null,
-        })
+    test("  a:  b", {
+        key: { text: "a", start: 2, end: 3 },
+        value: { text: "b", start: 6, end: 7 },
+        commentStart: null,
     })
-    it('comment line', () => {
-        deepStrictEqual(p.parseLine("#### MATPLOTLIBRC FORMAT"), null)
+    test("a: # b", {
+        key: { text: "a", start: 0, end: 1 },
+        value: { text: "", start: 2, end: 2 },
+        commentStart: 3,
     })
-    it("empty line", () => {
-        deepStrictEqual(p.parseLine(" "), null)
+    test("a:  # b", {
+        key: { text: "a", start: 0, end: 1 },
+        value: { text: "", start: 2, end: 2 },
+        commentStart: 4,
     })
-    it("without a value", () => {
-        deepStrictEqual(p.parseLine("key"), {
-            key: { text: "key", start: 0, end: 3 },
-            value: null,
-            commentStart: null,
-        })
+    test("#### MATPLOTLIBRC FORMAT", null)
+    test(" ", null)
+    test("key", {
+        key: { text: "key", start: 0, end: 3 },
+        value: null,
+        commentStart: null,
     })
 })
 
