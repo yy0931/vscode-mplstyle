@@ -313,11 +313,6 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }))
 
     const mapEdits = (/** @type {ReturnType<typeof formatLine>} */ edits, /** @type {number} */line) => edits.map((v) => v.edit === "delete" ? vscode.TextEdit.delete(new vscode.Range(line, v.start, line, v.end)) : vscode.TextEdit.replace(new vscode.Range(line, v.start, line, v.end), v.replacement))
-    context.subscriptions.push(vscode.languages.registerOnTypeFormattingEditProvider({ language: "mplstyle" }, {
-        provideOnTypeFormattingEdits(document, position) {
-            return mapEdits(formatLine(document.lineAt(position.line).text), position.line)
-        }
-    }, ":"))
     context.subscriptions.push(vscode.languages.registerDocumentRangeFormattingEditProvider({ language: "mplstyle" }, {
         provideDocumentRangeFormattingEdits(document, range) {
             const edits = []
