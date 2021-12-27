@@ -1,3 +1,5 @@
+const json5 = require("json5")
+
 /** @typedef {{
  *      key: { text: string, start: number, end: number },
  *      value: { text: string, start: number, end: number } | null,
@@ -6,10 +8,8 @@
  */
 /** @typedef {"Error" | "Warning"} Severity */
 
-const testing = typeof globalThis.it === 'function' && typeof globalThis.describe === 'function'
-
 /** https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/__init__.py#L724-L724 */
-const parseAll = (/** @type {string} */content) => {
+exports.parseAll = (/** @type {string} */content) => {
     /** @type {Map<string, { readonly pair: Pair, readonly line: number }[]>} */
     const rc = new Map()
 
@@ -35,7 +35,7 @@ const parseAll = (/** @type {string} */content) => {
 }
 
 /** @returns {Pair | null} */
-const parseLine = (/** @type {string} */line) => {
+const parseLine = exports.parseLine = (/** @type {string} */line) => {
     const commentStart = line.indexOf("#")
     line = (commentStart === -1 ? line : line.slice(0, commentStart)).trimEnd()
     const start = line.length - line.trimStart().length
@@ -58,43 +58,65 @@ const parseLine = (/** @type {string} */line) => {
     }
 }
 
-module.exports = { parseAll, parseLine }
+/** @returns {{ index: number, key: string }[]} */
+exports.findRcParamsInPythonFiles = (/** @type {string} */source) => {
+    /** @type {{ index: number, key: string }[]} */
+    const result = []
+    for (const matches of source.matchAll(/(?<=(?:matplotlib\.|mpl\.|matplotlib\.pyplot\.|plt\.|[^.]|^)\s*rcParams\s*\[\s*['"])(?<key>[^'"]*)/g)) {
+        if (matches.index !== undefined && matches.groups?.key !== undefined) {
+            result.push({ index: matches.index, key: matches.groups.key })
+        }
+    }
+    return result
+}
 
-if (testing) {
-    const { assert: { deepStrictEqual } } = require("chai")
+/**
+ * https://github.com/matplotlib/matplotlib/blob/main/lib/matplotlib/colors.py#L195
+ * @returns {readonly [r: number, g: number, b: number, a: number] | null}
+ */
+exports.parseColor = (/** @type {string} */value, /** @type {Map<string, readonly [number, number, number, number]>} */colorMap) => {
+    // none
+    if (value.toLowerCase() === "none") {
+        return [0, 0, 0, 0]
+    }
 
-    describe("parseLine", () => {
-        it("with a comment", () => {
-            deepStrictEqual(parseLine("  a:  b  # c"), { key: { text: "a", start: 2, end: 3 }, value: { text: "b", start: 6, end: 7 }, commentStart: 9 })
-        })
-        it("without comments", () => {
-            deepStrictEqual(parseLine("  a:  b"), { key: { text: "a", start: 2, end: 3 }, value: { text: "b", start: 6, end: 7 }, commentStart: null })
-        })
-        it('comment line', () => {
-            deepStrictEqual(parseLine("#### MATPLOTLIBRC FORMAT"), null)
-        })
-        it("empty line", () => {
-            deepStrictEqual(parseLine(" "), null)
-        })
-        it("without a value", () => {
-            const pair = parseLine("key")
-            deepStrictEqual(pair?.key.text, "key")
-            deepStrictEqual(pair?.value, null)
-        })
-    })
+    // red, blue, etc.
+    const color = colorMap.get(value)
+    if (color !== undefined) {
+        return [...color]
+    }
 
-    describe('parseAll', () => {
-        it("key-value pairs", () => {
-            const { rc, errors } = parseAll(`key1: value1 # comment1\n\nkey2: value2 # comment2`)
-            deepStrictEqual(errors, [])
-            deepStrictEqual(rc.get("key1")?.[0]?.pair.value?.text, "value1")
-            deepStrictEqual(rc.get("key2")?.[0]?.pair.value?.text, "value2")
-        })
-        it("missing colon", () => {
-            deepStrictEqual(parseAll(`key1 value1`).errors, [{ error: "Missing colon", severity: "Error", line: 0, columnStart: 0, columnEnd: 11 }])
-        })
-        it("duplicate key", () => {
-            deepStrictEqual(parseAll(`key1: value1\nkey1: value2`).errors, [{ error: `duplicate key "key1"`, severity: "Error", line: 1, columnStart: 0, columnEnd: 4 }])
-        })
-    })
+    // FFFFFF
+    if (/^[a-f0-9]{6}$/i.test(value)) {
+        return [
+            parseInt(value.slice(0, 2), 16) / 256,
+            parseInt(value.slice(2, 4), 16) / 256,
+            parseInt(value.slice(4, 6), 16) / 256,
+            1.0,
+        ]
+    }
+
+    // FFFFFFFF
+    if (/^[a-f0-9]{8}$/i.test(value)) {
+        return [
+            parseInt(value.slice(0, 2), 16) / 256,
+            parseInt(value.slice(2, 4), 16) / 256,
+            parseInt(value.slice(4, 6), 16) / 256,
+            parseInt(value.slice(6, 8), 16) / 256,
+        ]
+    }
+
+    // 0.0 = black, 1.0 = white
+    const x = (() => {
+        try {
+            return json5.parse(value)
+        } catch (err) {
+            return null
+        }
+    })()
+    if (typeof x === "number") {
+        return [x, x, x, 1.0]
+    }
+
+    return null
 }

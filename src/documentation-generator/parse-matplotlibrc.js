@@ -1,8 +1,6 @@
-const parseMplstyle = require("./mplstyle_parser")
+const parseMplstyle = require("../parser")
 
-const testing = typeof globalThis.it === 'function' && typeof globalThis.describe === 'function'
-
-const parseMatplotlibrc = (/** @type {string} */content) => {
+module.exports = (/** @type {string} */content) => {
     /** @typedef {[commentStart: string[], subheading: (() => string[]), section: string[]]} LazyComment */
     /** @type {Map<string, { exampleValue: string, comment: LazyComment }>} */
     const entries = new Map()
@@ -137,80 +135,4 @@ const parseMatplotlibrc = (/** @type {string} */content) => {
         exampleValue: v.exampleValue,
         comment: v.comment.map((v) => Array.isArray(v) ? v : v()).filter((v) => v.length > 0).map(/** @returns {string[]} */(v, i) => [...(i === 0 ? [] : ["", "---"]), ...v]).flat().join("\n"),
     }]))
-}
-
-module.exports = parseMatplotlibrc
-
-if (testing) {
-    const { assert: { deepStrictEqual } } = require("chai")
-
-    describe("parseMatplotlibrc", () => {
-        it("multi-line comments", () => {
-            deepStrictEqual(Array.from(parseMatplotlibrc(`\
-#key1: value1 # key1-comment1
-              # key1-comment2
-#key2: value2 # key2-comment1
-`).entries()), [
-                ['key1', { exampleValue: 'value1', comment: 'key1-comment1\nkey1-comment2' }],
-                ['key2', { exampleValue: 'value2', comment: 'key2-comment1' }],
-            ])
-        })
-        it("subheadings", () => {
-            deepStrictEqual(Array.from(parseMatplotlibrc(`\
-## a
-#key1: value1
-#key2: value2
-
-## b
-#key3: value3
-#key4: value4
-`).entries()), [
-                ['key1', { exampleValue: 'value1', comment: 'a\n\n- key1\n- key2' }],
-                ['key2', { exampleValue: 'value2', comment: 'a\n\n- key1\n- key2' }],
-                ['key3', { exampleValue: 'value3', comment: 'b\n\n- key3\n- key4' }],
-                ['key4', { exampleValue: 'value4', comment: 'b\n\n- key3\n- key4' }],
-            ])
-        })
-        it("Complex comments 1", () => {
-            const entries = parseMatplotlibrc(`
-## ***************************************************************************
-## * SECTION                                                                 *
-## ***************************************************************************
-## section body
-
-## subheading1
-## subheading2
-##key1: value1  # comment1
-                # comment2
-#key2: value2
-`)
-            deepStrictEqual(entries.get("key1"), {
-                exampleValue: "value1", comment: `\
-comment1
-comment2
-
----
-subheading1
-subheading2
-
-- key1
-- key2
-
----
-#### SECTION
-section body
-` })
-        })
-        it("Complex comments 2", () => {
-            const entries = parseMatplotlibrc(`
-## ***************************************************************************
-## * SECTION                                                                 *
-## ***************************************************************************
-#key1: value1
-## subheading2
-#key2: value2
-`)
-            deepStrictEqual(entries.get("key1"), { exampleValue: "value1", comment: `` })
-        })
-    })
 }

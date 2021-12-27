@@ -1,5 +1,5 @@
 const json5 = require("json5")
-const parseMatplotlibrc = require("./sample_matplotlibrc_parser")
+const parseMatplotlibrc = require("./parse-matplotlibrc")
 
 const json5Parse = (/** @type {string} */text) => {
     try {
@@ -9,12 +9,10 @@ const json5Parse = (/** @type {string} */text) => {
     }
 }
 
-const testing = typeof globalThis.it === 'function' && typeof globalThis.describe === 'function'
-
 /** https://stackoverflow.com/a/3561711/10710682 */
 const escapeRegExp = (/** @type {string} */string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
 
-const trimLineComment = (/** @type {string} */source) => {
+const trimLineComment = exports.trimLineComment = (/** @type {string} */source) => {
     /** @type {string} */
     let strLiteral = ""
     for (let i = 0; i < source.length; i++) {
@@ -42,47 +40,21 @@ const trimLineComment = (/** @type {string} */source) => {
     return source
 }
 
-if (testing) {
-    const { assert: { strictEqual } } = require("chai")
-
-    describe("trimLineComment", () => {
-        it("simple case", () => { strictEqual(trimLineComment("a # b"), "a") })
-        it("without a comment", () => { strictEqual(trimLineComment("a"), "a") })
-        it("single quotation marks", () => { strictEqual(trimLineComment("'#' # b"), "'#'") })
-        it("double quotation marks", () => { strictEqual(trimLineComment(`"#" # b`), `"#"`) })
-        it("multiple single quotation marks", () => { strictEqual(trimLineComment(`'''#''' # b`), `'''#'''`) })
-        it("multiple double quotation marks", () => { strictEqual(trimLineComment(`"""#""" # b`), `"""#"""`) })
-        it("quotation marks in a string literal 1", () => { strictEqual(trimLineComment(String.raw`"'#\"#" # b`), String.raw`"'#\"#"`) })
-        it("quotation marks in a string literal 2", () => { strictEqual(trimLineComment(`"""'#"#""" # b`), `"""'#"#"""`) })
-    })
-}
-
 /**
- * Parse
- * ```python
- * <variableNamePattern> = {
- *     "a": b,  # comment
- *     "c": d
- * }
- * ```
- * to
- * ```
- * [{ key: "a", value: "b" }, { key: "c", value: "d" }]
- * ```
- * @returns {[{ key: string, value: string }[], string[]]}
+ * @returns {{ result: { key: string, value: string }[], err: string[] }}
  */
-const parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
+const parseDict = exports.parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
     content = content.replace(/\r/g, "")
     const replaced = content.replace(new RegExp(String.raw`^(.|\n)*\n\s*${variableNamePattern}\s*=\s*\{\n`), "") // remove the code before `_validators = {`
     if (content === replaced) {
-        return [[], [`Parse error: "${variableNamePattern}" does not exist`]]
+        return { result: [], err: [`Parse error: "${variableNamePattern}" does not exist`] }
     }
     content = replaced
 
     /** @type {{ readonly value: string, readonly key: string }[]} */
     const result = []
     /** @type {string[]} */
-    const errors = []
+    const err = []
     const lines = content.split("\n").map((line) => line.trim())
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
@@ -116,104 +88,11 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableN
             }
             result.push({ value, key })
         } else if (!/^\s*(?:#.*)?$/.test(line)) {
-            errors.push(`Parse error: "${line}"`)
+            err.push(`Parse error: "${line}"`)
         }
     }
 
-    return [result, errors]
-}
-
-if (testing) {
-    const { assert: { deepStrictEqual } } = require("chai")
-
-    describe("parseDict", () => {
-        it("key-value pairs", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "key1": value1,
-    "key2": value2
-}
-`, 'dict_name'), [[{ key: "key1", value: "value1" }, { key: "key2", value: "value2" }], []])
-        })
-
-        it("ignore comments", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "key1": value1,  # comment
-}
-`, 'dict_name'), [[{ key: "key1", value: "value1" }], []])
-        })
-
-        it("ignore whitespace around last comma", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "key1": value1  ,  # comment
-}
-`, 'dict_name'), [[{ key: "key1", value: "value1" }], []])
-        })
-
-        it("multi-line list literals", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "key1": [  # comment
-        "a",   # comment
-        "b"    # comment
-    ],         # comment
-}
-`, 'dict_name'), [[{ key: "key1", value: `["a","b"]` }], []])
-        })
-
-        it("function calls", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "key1": func("a", "b") # comment
-}
-`, 'dict_name'), [[{ key: "key1", value: `func("a", "b")` }], []])
-        })
-
-        it("multi-line function calls", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "key1": func(  # comment
-        "a",   # comment
-        "b"    # comment
-    ),         # comment
-}
-`, 'dict_name'), [[{ key: "key1", value: `func("a","b")` }], []])
-        })
-
-        it("comments containing double quotes", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "key": value,  # "foo" 'bar'
-}
-`, 'dict_name'), [[{ key: "key", value: `value` }], []])
-        })
-
-        it("hash sign in a string literal", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "value": "#000000",
-}
-`, 'dict_name'), [[{ key: "value", value: `"#000000"` }], []])
-        })
-
-        it("parse error 1", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    "a": "b",
-}
-`, 'aa'), [[], [`Parse error: "aa" does not exist`]])
-        })
-
-        it("parse error 2", () => {
-            deepStrictEqual(parseDict(`
-dict_name = {
-    test
-}
-`, 'dict_name'), [[], [`Parse error: "test"`]])
-        })
-    })
+    return { result, err }
 }
 
 const matchExpr = (/** @type {string} */pattern, /** @type {string} */source) => {
@@ -226,7 +105,7 @@ const r = String.raw.bind(String)
  * @typedef {{ readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }} Type
  * @returns {Type}
  */
-const parseValidator = (/** @type {string} */source, /** @type {{ none: string, bool: string[] }} */keywords = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }) => {
+const parseValidator = exports.parseValidator = (/** @type {string} */source, /** @type {{ none: string, bool: string[] }} */keywords = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }) => {
     /** @type {(x: { readonly label: string, check: Type["check"] } & Partial<Type>) => Type} */
     const makeType = (x) => ({ constants: [], color: false, shortLabel: x.label, ...x })
 
@@ -406,69 +285,8 @@ const parseValidator = (/** @type {string} */source, /** @type {{ none: string, 
     }
 }
 
-if (testing) {
-    const { assert: { strictEqual } } = require("chai")
-
-    describe('parseValidator', () => {
-        describe("type checking", () => {
-            it("1, 2.3, 4: validate_floatlist", () => { strictEqual(parseValidator("validate_floatlist").check("1, 2.3, 4"), true) })
-            it("         : validate_floatlist", () => { strictEqual(parseValidator("validate_floatlist").check(""), true) })
-            it("a, b     : validate_floatlist", () => { strictEqual(parseValidator("validate_floatlist").check("a, b"), false) })
-            it("a        : validate_floatlist", () => { strictEqual(parseValidator("validate_floatlist").check("a"), false) })
-
-            it("a : ['a', 'bc']", () => { strictEqual(parseValidator("['a', 'bc']").check("a"), true) })
-            it("bc: ['a', 'bc']", () => { strictEqual(parseValidator("['a', 'bc']").check("bc"), true) })
-            it("  : ['a', 'bc']", () => { strictEqual(parseValidator("['a', 'bc']").check(""), false) })
-            it("b : ['a', 'bc']", () => { strictEqual(parseValidator("['a', 'bc']").check("b"), false) })
-
-            it("none: validate_float_or_None", () => { strictEqual(parseValidator("validate_float_or_None").check("none"), true) })
-            it("None: validate_float_or_None", () => { strictEqual(parseValidator("validate_float_or_None").check("None"), true) })
-            it("2.5 : validate_float_or_None", () => { strictEqual(parseValidator("validate_float_or_None").check("2.5"), true) })
-            it("    : validate_float_or_None", () => { strictEqual(parseValidator("validate_float_or_None").check(""), false) })
-            it("aa  : validate_float_or_None", () => { strictEqual(parseValidator("validate_float_or_None").check("aa"), false) })
-
-            it("20  : validate_int", () => { strictEqual(parseValidator("validate_int").check("20"), true) })
-            it("-100: validate_int", () => { strictEqual(parseValidator("validate_int").check("-100"), true) })
-            it("0   : validate_int", () => { strictEqual(parseValidator("validate_int").check("0"), true) })
-            it("20.5: validate_int", () => { strictEqual(parseValidator("validate_int").check("20.5"), false) })
-            it("a   : validate_int", () => { strictEqual(parseValidator("validate_int").check("a"), false) })
-            it("    : validate_int", () => { strictEqual(parseValidator("validate_int").check(""), false) })
-
-            it(`0  : _range_validators["0 <= x <= 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x <= 1"]`).check("0"), true) })
-            it(`0.5: _range_validators["0 <= x <= 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x <= 1"]`).check("0.5"), true) })
-            it(`1  : _range_validators["0 <= x <= 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x <= 1"]`).check("1"), true) })
-            it(`a  : _range_validators["0 <= x <= 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x <= 1"]`).check("a"), false) })
-            it(`   : _range_validators["0 <= x <= 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x <= 1"]`).check(""), false) })
-
-            it(`0  : _range_validators["0 <= x < 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x < 1"]`).check("0"), true) })
-            it(`0.5: _range_validators["0 <= x < 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x < 1"]`).check("0.5"), true) })
-            it(`1  : _range_validators["0 <= x < 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x < 1"]`).check("1"), false) })
-            it(`a  : _range_validators["0 <= x < 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x < 1"]`).check("a"), false) })
-            it(`   : _range_validators["0 <= x < 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x < 1"]`).check(""), false) })
-        })
-        describe("color", () => {
-            it("validate_float", () => { strictEqual(parseValidator("validate_float").color, false) })
-            it(`_range_validators["0 <= x < 1"]`, () => { strictEqual(parseValidator(`_range_validators["0 <= x < 1"]`).color, false) })
-            it("validate_color", () => { strictEqual(parseValidator("validate_color").color, true) })
-            it("validate_color_or_auto", () => { strictEqual(parseValidator("validate_color_or_auto").color, true) })
-        })
-        describe("label", () => {
-            it("enum", () => { strictEqual(parseValidator(`["a", "bc"]`).label, `"a" | "bc"`) })
-            it("str", () => { strictEqual(parseValidator("validate_string").label, `str`) })
-            it("int", () => { strictEqual(parseValidator("validate_int").label, `int`) })
-            it("range", () => { strictEqual(parseValidator(`_range_validators["0 <= x <= 1"]`).label, `float (0 <= x <= 1)`) })
-            it("floatlist", () => { strictEqual(parseValidator("validate_floatlist").label, `list[float]`) })
-            it("unknown", () => { strictEqual(parseValidator("validate_undefinedtype").label, `undefinedtype (any)`) })
-            it("any", () => { strictEqual(parseValidator("validate_foo").label, `foo (any)`) })
-            it("untyped", () => { strictEqual(parseValidator("foo").label, `foo (any)`) })
-            it("fixed length list", () => { strictEqual(parseValidator(`_listify_validator(validate_int, n=3)`).label, `list[int] (len=3)`) })
-            it("allow_stringlists", () => { strictEqual(parseValidator(`_listify_validator(validate_int, allow_stringlist=True)`).label, `str | list[int]`) })
-        })
-    })
-}
-
 /** @type {<Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, keywords?: { none: string, bool: string[] }) => Promise<{ params: Map<string, Type>, cyclerProps: Map<string, Type>, documentation: Map<string, { exampleValue: string; comment: string }>, errors: string[] }>} */
-const parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile, isNOENT, keywords) => {
+exports.parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile, isNOENT, keywords) => {
     // Read and parse matplotlib/rcsetup.py
     const useDefaultPath = !matplotlibPath
     const matplotlibDirectory = useDefaultPath ? joinPaths(extensionPath, "matplotlib") : matplotlibPath
@@ -502,20 +320,20 @@ const parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile
         return { params: new Map(), cyclerProps: new Map(), documentation: new Map(), errors: [...errors, rcsetup.err] }
     }
     const validators = parseDict(rcsetup.content, '_validators')
-    errors.push(...validators[1].map((v) => `Error during parsing rcsetup.py: ${v}`))
+    errors.push(...validators.err.map((v) => `Error during parsing rcsetup.py: ${v}`))
     const propValidators = parseDict(rcsetup.content, '_prop_validators')
-    errors.push(...propValidators[1].map((v) => `Error during parsing rcsetup.py: ${v}`))
+    errors.push(...propValidators.err.map((v) => `Error during parsing rcsetup.py: ${v}`))
 
     // dirty fix
-    for (const item of validators[0]) {
+    for (const item of validators.result) {
         if (item.key === "ps.papersize") {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L1156-L1156
             item.value = JSON.stringify(["auto", "letter", "legal", "ledger", ...Array(11).fill(0).map((_, i) => [`a${i}`, `b${i}`]).flat()])
         }
     }
 
-    const params = new Map(validators[0].map(({ key, value }) => [key, parseValidator(value, keywords)]))
-    const cyclerProps = new Map(propValidators[0].map(({ key, value }) => [key, parseValidator(value, keywords)]))
+    const params = new Map(validators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
+    const cyclerProps = new Map(propValidators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
 
     const matplotlibrc = await readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))
     if ("err" in matplotlibrc) {
@@ -525,4 +343,3 @@ const parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile
 
     return { params, cyclerProps, documentation: parseMatplotlibrc(matplotlibrc.content), errors }
 }
-module.exports = parseMplSource
