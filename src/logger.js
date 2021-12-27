@@ -1,6 +1,6 @@
 const vscode = require("vscode")
 
-class Logger {
+module.exports = class Logger {
     #outputChannel
 
     constructor() {
@@ -51,5 +51,3 @@ class Logger {
         vscode.window.showErrorMessage(`mplstyle: ${message}`)
     }
 }
-
-module.exports = Logger

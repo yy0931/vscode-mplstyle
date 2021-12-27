@@ -1,7 +1,7 @@
 const vscode = require("vscode")
-const { parseMplSource } = require("./documentation-generator/parse-rcsetup.py")
-const mplstyleParser = require("./parser")
 const Logger = require("./logger")
+const documentationGenerator = require("./documentation-generator")
+const mplstyleParser = require("./parser")
 const { formatLine } = require("./format")
 
 const toHex = (/** @type {readonly [number, number, number, number]} */color) => {
@@ -44,40 +44,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         })))
     }
 
-    let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
+    let mpl = await documentationGenerator.parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
     for (const err of mpl.errors) {
         logger.error(err)
-    }
-
-    const buildDocumentationOf = {
-        key: (/** @type {string} */text, /** @type {import("./documentation-generator/parse-rcsetup.py").Type} */type, /** @type {boolean} */showComparisonImage, /** @type {Map<string, string>} */images, /** @type {Awaited<ReturnType<typeof parseMplSource>>} */mpl) => {
-            const documentation = new vscode.MarkdownString()
-            const image = images.get(text)
-            if (showComparisonImage && image !== undefined) {
-                documentation.appendMarkdown(`![${text}](${image}|height=150)\n\n`)
-            }
-            documentation.appendMarkdown("---\n" + (mpl.documentation.get(text)?.comment ?? "") + "\n\n---\n#### Example")
-            documentation.appendCodeblock(`${text}: ${mpl.documentation.get(text)?.exampleValue ?? ""}`, "mplstyle")
-            return {
-                detail: {
-                    plaintext: `${text}: ${type.label}`,
-                    md: new vscode.MarkdownString().appendCodeblock(`${text}: ${type.label}`, "python"),
-                },
-                documentation,
-            }
-        },
-        cycler: () => ({
-            detail: {
-                form2: {
-                    param1: `label: ${Array.from(mpl.cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
-                    param2: `values: list`,
-                },
-                form3: {
-                    kwargs: Array.from(mpl.cyclerProps.entries()).map(([k, v]) => `${k}: ${v.shortLabel}`),
-                }
-            },
-            documentation: new vscode.MarkdownString("Creates a `cycler.Cycler` which cycles over one or more colors simultaneously."),
-        })
     }
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
@@ -130,8 +99,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (ev) => logger.try(async () => {
         if (ev.affectsConfiguration("mplstyle.hover.matplotlibPath") || ev.affectsConfiguration("mplstyle.completion.keywords")) {
-
-            mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
+            mpl = await documentationGenerator.parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
             for (const err of mpl.errors) {
                 logger.error(err)
             }
@@ -143,10 +111,9 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             return logger.trySync(() => {
                 for (const { index, key } of mplstyleParser.findRcParamsInPythonFiles(document.lineAt(position.line).text)) {
                     if (index <= position.character && position.character < index + key.length) {
-                        const type = mpl.params.get(key)
-                        if (type === undefined) { break }
-                        const { detail, documentation } = buildDocumentationOf.key(key, type, vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true, images, mpl)
-                        return new vscode.Hover(detail.md.appendMarkdown(documentation.value), new vscode.Range(position.line, index, position.line, index + key.length))
+                        const docs = documentationGenerator.key(key, { showImage: vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true, images, mpl })
+                        if (docs === null) { return undefined }
+                        return new vscode.Hover(new vscode.MarkdownString(docs.detail.md + "---\n" + docs.documentation), new vscode.Range(position.line, index, position.line, index + key.length))
                     }
                 }
             })
@@ -161,20 +128,19 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
 
                 if (line.key.start <= position.character && position.character < line.key.end) {
                     // Key
-                    const type = mpl.params.get(line.key.text)
-                    if (type == undefined) { return }
-                    const { detail, documentation } = buildDocumentationOf.key(line.key.text, type, vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true, images, mpl)
-                    return new vscode.Hover(detail.md.appendMarkdown(documentation.value), new vscode.Range(position.line, line.key.start, position.line, line.key.end))
+                    const docs = documentationGenerator.key(line.key.text, { showImage: vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true, images, mpl })
+                    if (docs === null) { return undefined }
+                    return new vscode.Hover(new vscode.MarkdownString(docs.detail.md + "---\n" + docs.documentation), new vscode.Range(position.line, line.key.start, position.line, line.key.end))
                 } else if (line.value !== null && line.value.start <= position.character && position.character < line.value.end) {
                     // Value
                     const matches = /^\s*cycler\b/.exec(line.value.text)
                     if (matches !== null && line.value.start + matches.index <= position.character && position.character < line.value.start + matches.index + matches[0].length) {
-                        const cycler = buildDocumentationOf.cycler()
+                        const cycler = documentationGenerator.cycler()
                         return new vscode.Hover(
                             new vscode.MarkdownString()
                                 .appendCodeblock(`cycler(${cycler.detail.form2.param1}, ${cycler.detail.form2.param2})\ncycler(*, ${cycler.detail.form3.kwargs.join(", ")})`, 'python')
                                 .appendMarkdown("---\n")
-                                .appendMarkdown(cycler.documentation.value),
+                                .appendMarkdown(cycler.documentation),
                             new vscode.Range(position.line, line.value.start + matches.index, position.line, line.value.start + matches.index + matches[0].length),
                         )
                     }
@@ -189,13 +155,14 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 for (const match of mplstyleParser.findRcParamsInPythonFiles(document.lineAt(position.line).text)) {
                     if (!(match.index <= position.character && position.character <= match.index + match.key.length)) { continue }
                     const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true
-                    return Array.from(mpl.params.entries()).map(([key, type]) => {
+                    return Array.from(mpl.params.keys()).flatMap((key) => {
                         const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                        const { detail, documentation } = buildDocumentationOf.key(key, type, showComparisonImage, images, mpl)
-                        item.detail = `${detail.plaintext} (mplstyle)`
-                        item.documentation = documentation
+                        const docs = documentationGenerator.key(key, { showImage: showComparisonImage, images, mpl })
+                        if (docs === null) { return [] }
+                        item.detail = `${docs.detail.plaintext} (mplstyle)`
+                        item.documentation = new vscode.MarkdownString(docs.documentation)
                         item.range = new vscode.Range(position.line, match.index, position.line, match.index + match.key.length)
-                        return item
+                        return [item]
                     })
                 }
             })
@@ -230,7 +197,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             const item = new vscode.CompletionItem('cycler', vscode.CompletionItemKind.Function)
                             item.insertText = new vscode.SnippetString("cycler(color=[${1}])")
                             item.command = { title: "Trigger Parameter Hints", command: "editor.action.triggerParameterHints" }
-                            item.documentation = buildDocumentationOf.cycler().documentation
+                            item.documentation = new vscode.MarkdownString(documentationGenerator.cycler().documentation)
                             items.push(item)
                         } else {
                             items.push(...colors("'"))
@@ -241,11 +208,12 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     // Key
                     /** @type {boolean} */
                     const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true
-                    return Array.from(mpl.params.entries()).map(([key, type]) => {
+                    return Array.from(mpl.params.entries()).flatMap(([key, type]) => {
+                        const docs = documentationGenerator.key(key, { showImage: showComparisonImage, images, mpl })
+                        if (docs === null) { return [] }
                         const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
-                        const { detail, documentation } = buildDocumentationOf.key(key, type, showComparisonImage, images, mpl)
-                        item.detail = detail.plaintext
-                        item.documentation = documentation
+                        item.detail = docs.detail.plaintext
+                        item.documentation = new vscode.MarkdownString(docs.documentation)
                         const colon = textLine.text.indexOf(":")
                         if (colon === -1) {
                             // Replace the entire line
@@ -258,7 +226,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             // Replace the key
                             item.range = new vscode.Range(position.line, 0, position.line, colon)
                         }
-                        return item
+                        return [item]
                     })
                 }
             })
@@ -273,7 +241,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 if (pair === null || pair.value === null) { return }
                 if (/^\s*cycler\b/.test(pair.value.text)) {
                     // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L618-L618
-                    const cycler = buildDocumentationOf.cycler()
+                    const cycler = documentationGenerator.cycler()
                     const form2 = new vscode.SignatureInformation(`cycler(${cycler.detail.form2.param1}, ${cycler.detail.form2.param2})`)
                     form2.parameters = [new vscode.ParameterInformation(cycler.detail.form2.param1), new vscode.ParameterInformation(cycler.detail.form2.param2)]
                     const form3 = new vscode.SignatureInformation(`cycler(*, ${cycler.detail.form3.kwargs.join(", ")})`)
@@ -339,7 +307,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                 return result
             })
         },
-        provideColorPresentations(color, ctx) {
+        provideColorPresentations(color) {
             return logger.trySync(() => [new vscode.ColorPresentation(toHex([color.red, color.green, color.blue, color.alpha]))])
         }
     }))
