@@ -89,9 +89,9 @@ exports.parseColor = (/** @type {string} */value, /** @type {Map<string, readonl
     // FFFFFF
     if (/^[a-f0-9]{6}$/i.test(value)) {
         return [
-            parseInt(value.slice(0, 2), 16) / 256,
-            parseInt(value.slice(2, 4), 16) / 256,
-            parseInt(value.slice(4, 6), 16) / 256,
+            parseInt(value.slice(0, 2), 16) / 255,
+            parseInt(value.slice(2, 4), 16) / 255,
+            parseInt(value.slice(4, 6), 16) / 255,
             1.0,
         ]
     }
@@ -99,10 +99,10 @@ exports.parseColor = (/** @type {string} */value, /** @type {Map<string, readonl
     // FFFFFFFF
     if (/^[a-f0-9]{8}$/i.test(value)) {
         return [
-            parseInt(value.slice(0, 2), 16) / 256,
-            parseInt(value.slice(2, 4), 16) / 256,
-            parseInt(value.slice(4, 6), 16) / 256,
-            parseInt(value.slice(6, 8), 16) / 256,
+            parseInt(value.slice(0, 2), 16) / 255,
+            parseInt(value.slice(2, 4), 16) / 255,
+            parseInt(value.slice(4, 6), 16) / 255,
+            parseInt(value.slice(6, 8), 16) / 255,
         ]
     }
 
