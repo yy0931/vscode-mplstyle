@@ -296,8 +296,8 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                             result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), new vscode.Color(...color)))
                         }
                     } else if (type.label === "cycler") {
-                        // '0.40', 'E24A33', etc.
-                        const pattern = /'(?:\w|\d|-|[.])*'|"(?:\w|\d|-|[.])*"/gi
+                        // '0.40', 'E24A33', 'xkcd:acid green', etc.
+                        const pattern = /'[\w\d\-:. ]*'|"[\w\d\-:. ]*"/gi
                         for (const matches of pair.value.text.matchAll(pattern)) {
                             if (matches.index === undefined) { continue }
                             const color = mplstyleParser.parseColor(pair.value.text.slice(matches.index + 1, matches.index + matches[0].length - 1), colorMap)
