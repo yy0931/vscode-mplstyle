@@ -29,7 +29,7 @@ module.exports = class Logger {
         try {
             const out = f()
             if (out instanceof Promise) {
-                this.warning(`the argument of trySync() returned a Promise`)
+                this.warning(`The function passed to trySync() returned a Promise`)
             }
             return out
         } catch (err) {

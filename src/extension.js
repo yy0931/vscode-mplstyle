@@ -2,7 +2,26 @@ const vscode = require("vscode")
 const Logger = require("./logger")
 const documentationGenerator = require("./documentation-generator")
 const mplstyleParser = require("./parser")
-const { formatLine } = require("./format")
+
+const formatLine = (/** @type {string} */line) => {
+    const pair = mplstyleParser.parseLine(line)
+    if (pair === null) { return [] }
+
+    /** @type {({ edit: "delete", start: number, end: number } | { edit: "replace", start: number, end: number, replacement: string })[]} */
+    const edits = []
+
+    // `  a: b` -> `a: b`
+    if (pair.key.start > 0) {
+        edits.push({ edit: "delete", start: 0, end: pair.key.start })
+    }
+
+    // `a : b` -> `a: b`, `a:  b` -> `a: b`, `a:b` -> `a: b`
+    if (pair.value !== null && pair.value.text !== "" && (line[pair.key.end] !== ":" || pair.key.end + 2 !== pair.value.start)) {
+        edits.push({ edit: "replace", start: pair.key.end, end: pair.value.start, replacement: ": " })
+    }
+
+    return edits
+}
 
 const toHex = (/** @type {readonly [number, number, number, number]} */color) => {
     return ("00" + Math.floor(color[0] * 255).toString(16).toUpperCase()).slice(-2) +
@@ -10,6 +29,8 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
         ("00" + Math.floor(color[2] * 255).toString(16).toUpperCase()).slice(-2) +
         (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
 }
+
+exports._testing = { formatLine, toHex }
 
 const readFile = async (/** @type {vscode.Uri} */ filepath) => vscode.workspace.fs.readFile(filepath).then((v) => new TextDecoder().decode(v))
 const isNOENT = (/** @type {unknown} */ err) => err instanceof vscode.FileSystemError && ["FileNotFound", "FileIsADirectory", "NoPermissions"].includes(err.code)

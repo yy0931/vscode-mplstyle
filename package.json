@@ -101,7 +101,20 @@
 						"minLength": 1
 					},
 					"uniqueItems": true,
-					"default": ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"]
+					"default": [
+						"t",
+						"y",
+						"yes",
+						"on",
+						"True",
+						"1",
+						"f",
+						"n",
+						"no",
+						"off",
+						"False",
+						"0"
+					]
 				},
 				"mplstyle.completion.keywords.none": {
 					"type": "string",
@@ -127,7 +140,7 @@
 		"webpack": "npx webpack",
 		"prepare": "python3 scripts/generate_documentation_images.py && npm i @vscode/webview-ui-toolkit@0.8.2 --prefix webview-ui-toolkit && cp webview-ui-toolkit/node_modules/@vscode/webview-ui-toolkit/dist/toolkit.min.js src/preview/webview-ui-toolkit.min.js && rimraf webview-ui-toolkit",
 		"vscode:prepublish": "npm run webpack && python3 scripts/generate_documentation_images.py",
-		"test": "nyc mocha 'src/**/*.test.js'",
+		"test": "jest",
 		"test-web": "npm run webpack && npx @vscode/test-web --extensionDevelopmentPath=."
 	},
 	"dependencies": {
@@ -137,15 +150,12 @@
 		"which": "^2.0.2"
 	},
 	"devDependencies": {
-		"@types/chai": "^4.2.22",
-		"@types/mocha": "^9.0.0",
+		"@types/jest": "^27.4.1",
 		"@types/node": "^16.11.6",
 		"@types/vscode": "^1.60.0",
 		"@types/which": "^2.0.1",
 		"@vscode/test-web": "^0.0.15",
-		"chai": "^4.3.4",
-		"mocha": "^9.1.3",
-		"nyc": "^15.1.0",
+		"jest": "^27.5.1",
 		"rimraf": "^3.0.2",
 		"terser-webpack-plugin": "^5.2.4",
 		"webpack": "^5.62.1",

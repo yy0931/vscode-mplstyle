@@ -1,20 +1,19 @@
-const { assert: { deepStrictEqual } } = require("chai")
-const parseMatplotlibrc = require("./parse-matplotlibrc")
+const parseMatplotlibrc = require("../src/documentation-generator/parse-matplotlibrc")
 
 describe("parseMatplotlibrc", () => {
-    it("multi-line comments", () => {
-        deepStrictEqual(Array.from(parseMatplotlibrc(`\
+    test("multi-line comments", () => {
+        expect(Array.from(parseMatplotlibrc(`\
 #key1: value1 # key1-comment1
               # key1-comment2
 #key2: value2 # key2-comment1
-`).entries()), [
+`).entries())).toEqual([
             ['key1', { exampleValue: 'value1', comment: 'key1-comment1\nkey1-comment2' }],
             ['key2', { exampleValue: 'value2', comment: 'key2-comment1' }],
         ])
     })
 
-    it("subheadings", () => {
-        deepStrictEqual(Array.from(parseMatplotlibrc(`\
+    test("subheadings", () => {
+        expect(Array.from(parseMatplotlibrc(`\
 ## a
 #key1: value1
 #key2: value2
@@ -22,7 +21,7 @@ describe("parseMatplotlibrc", () => {
 ## b
 #key3: value3
 #key4: value4
-`).entries()), [
+`).entries())).toEqual([
             ['key1', { exampleValue: 'value1', comment: 'a\n\n- key1\n- key2' }],
             ['key2', { exampleValue: 'value2', comment: 'a\n\n- key1\n- key2' }],
             ['key3', { exampleValue: 'value3', comment: 'b\n\n- key3\n- key4' }],
@@ -30,8 +29,8 @@ describe("parseMatplotlibrc", () => {
         ])
     })
 
-    it("Complex comments 1", () => {
-        deepStrictEqual(parseMatplotlibrc(`
+    test("Complex comments 1", () => {
+        expect(parseMatplotlibrc(`
 ## ***************************************************************************
 ## * SECTION                                                                 *
 ## ***************************************************************************
@@ -42,7 +41,7 @@ describe("parseMatplotlibrc", () => {
 ##key1: value1  # comment1
                 # comment2
 #key2: value2
-`).get("key1"), {
+`).get("key1")).toEqual({
             exampleValue: "value1",
             comment: `\
 comment1
@@ -61,15 +60,15 @@ section body
 ` })
     })
 
-    it("Complex comments 2", () => {
-        deepStrictEqual(parseMatplotlibrc(`
+    test("Complex comments 2", () => {
+        expect(parseMatplotlibrc(`
 ## ***************************************************************************
 ## * SECTION                                                                 *
 ## ***************************************************************************
 #key1: value1
 ## subheading2
 #key2: value2
-`).get("key1"), {
+`).get("key1")).toEqual({
             exampleValue: "value1",
             comment: ``,
         })

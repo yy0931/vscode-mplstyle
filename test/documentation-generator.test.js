@@ -1,5 +1,4 @@
-const { assert: { deepStrictEqual } } = require("chai")
-const documentationGenerator = require(".")
+const documentationGenerator = require("../src/documentation-generator")
 
 describe("documentationGenerator.key", () => {
     const images = new Map([["foo.bar", "image-uri"]])
@@ -14,8 +13,8 @@ describe("documentationGenerator.key", () => {
         ]),
     }
 
-    it("showImage: true", () => {
-        deepStrictEqual(documentationGenerator.key("foo.bar", { images, showImage: true, mpl }), {
+    test("showImage: true", () => {
+        expect(documentationGenerator.key("foo.bar", { images, showImage: true, mpl })).toEqual({
             detail: {
                 plaintext: 'foo.bar: string',
                 md: `\
@@ -39,8 +38,8 @@ foo.bar: example
         })
     })
 
-    it("showImage: false", () => {
-        deepStrictEqual(documentationGenerator.key("foo.bar", { images, showImage: false, mpl })?.documentation, `\
+    test("showImage: false", () => {
+        expect(documentationGenerator.key("foo.bar", { images, showImage: false, mpl })?.documentation).toEqual(`\
 comment
 
 ---
@@ -53,13 +52,13 @@ foo.bar: example
 })
 
 describe("documentationGenerator.cycler", () => {
-    it("test", () => {
-        deepStrictEqual(documentationGenerator.cycler({
+    test("test", () => {
+        expect(documentationGenerator.cycler({
             cyclerProps: new Map([
                 ["prop1", { label: "string", shortLabel: "string", check: () => true, color: false, constants: [] }],
                 ["prop2", { label: "string", shortLabel: "string", check: () => true, color: false, constants: [] }],
             ])
-        }), {
+        })).toEqual({
             detail: {
                 form2: { param1: 'label: "prop1" | "prop2"', param2: 'values: list' },
                 form3: { kwargs: ["prop1: string", "prop2: string"] },
