@@ -1,0 +1,112 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`comment only 1`] = `
+Array [
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+    ],
+    "token": "  ",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "comment.line.number-sign.mplstyle",
+      "punctuation.definition.comment.mplstyle",
+    ],
+    "token": "#",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "comment.line.number-sign.mplstyle",
+    ],
+    "token": " comment",
+  },
+]
+`;
+
+exports[`key and colon 1`] = `
+Array [
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "entity.name.label.mplstyle",
+    ],
+    "token": "foo.bar",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "punctuation.separator.key-value.mapping.mplstyle",
+    ],
+    "token": ":",
+  },
+]
+`;
+
+exports[`key only 1`] = `
+Array [
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "entity.name.label.mplstyle",
+    ],
+    "token": "foo.bar",
+  },
+]
+`;
+
+exports[`key, value and comment 1`] = `
+Array [
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "entity.name.label.mplstyle",
+    ],
+    "token": "foo.bar",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "punctuation.separator.key-value.mapping.mplstyle",
+    ],
+    "token": ":",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+    ],
+    "token": " ",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "support.constant.property-value.mplstyle",
+      "meta.property-value.mplstyle",
+    ],
+    "token": "baz",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+    ],
+    "token": "  ",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "comment.line.number-sign.mplstyle",
+      "punctuation.definition.comment.mplstyle",
+    ],
+    "token": "#",
+  },
+  Object {
+    "scopes": Array [
+      "source.mplstyle",
+      "comment.line.number-sign.mplstyle",
+    ],
+    "token": " comment",
+  },
+]
+`;
