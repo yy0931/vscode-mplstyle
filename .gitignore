@@ -16,3 +16,4 @@ __pycache__/
 src/preview/webview-ui-toolkit.min.js
 browser/
 .vscode-test-web/
+coverage/

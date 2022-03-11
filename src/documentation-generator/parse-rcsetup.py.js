@@ -12,7 +12,7 @@ const json5Parse = (/** @type {string} */text) => {
 /** https://stackoverflow.com/a/3561711/10710682 */
 const escapeRegExp = (/** @type {string} */string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
 
-const trimLineComment = exports.trimLineComment = (/** @type {string} */source) => {
+const trimLineComment = (/** @type {string} */source) => {
     /** @type {string} */
     let strLiteral = ""
     for (let i = 0; i < source.length; i++) {
@@ -43,7 +43,7 @@ const trimLineComment = exports.trimLineComment = (/** @type {string} */source) 
 /**
  * @returns {{ result: { key: string, value: string }[], err: string[] }}
  */
-const parseDict = exports.parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
+const parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
     content = content.replace(/\r/g, "")
     const replaced = content.replace(new RegExp(String.raw`^(.|\n)*\n\s*${variableNamePattern}\s*=\s*\{\n`), "") // remove the code before `_validators = {`
     if (content === replaced) {
@@ -105,7 +105,7 @@ const r = String.raw.bind(String)
  * @typedef {{ readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }} Type
  * @returns {Type}
  */
-const parseValidator = exports.parseValidator = (/** @type {string} */source, /** @type {{ none: string, bool: string[] }} */keywords = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }) => {
+const parseValidator = (/** @type {string} */source, /** @type {{ none: string, bool: string[] }} */keywords = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }) => {
     /** @type {(x: { readonly label: string, check: Type["check"] } & Partial<Type>) => Type} */
     const makeType = (x) => ({ constants: [], color: false, shortLabel: x.label, ...x })
 
@@ -343,3 +343,5 @@ exports.parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFi
 
     return { params, cyclerProps, documentation: parseMatplotlibrc(matplotlibrc.content), errors }
 }
+
+exports._testing = { trimLineComment, parseDict, parseValidator }

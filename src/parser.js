@@ -1,9 +1,9 @@
 const json5 = require("json5")
 
 /** @typedef {{
- *      key: { text: string, start: number, end: number },
- *      value: { text: string, start: number, end: number } | null,
- *      commentStart: number | null,
+ *      key: { text: string, start: number, end: number }
+ *      value: { text: string, start: number, end: number } | null
+ *      commentStart: number | null
  *  }} Pair
  */
 /** @typedef {"Error" | "Warning"} Severity */

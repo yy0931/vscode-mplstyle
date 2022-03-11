@@ -2,237 +2,180 @@ const { spawnSync } = require("child_process")
 const fs = require("fs")
 const path = require("path")
 const p = require("../src/documentation-generator/parse-rcsetup.py")
+const { testInputOutput, testInputOutputWithTitle } = require("./helper")
 
 describe("trimLineComment", () => {
-    const testTrimLineComment = (/** @type {string} */l, /** @type {string} */r) =>
-        test(l, () => { expect(p.trimLineComment(l)).toEqual(r) })
-
-    testTrimLineComment(
-        "a # b",
-        "a",
-    )
-    testTrimLineComment(
-        "a",
-        "a",
-    )
-    testTrimLineComment(
-        "'#' # b",
-        "'#'",
-    )
-    testTrimLineComment(
-        `"#" # b`,
-        `"#"`,
-    )
-    testTrimLineComment(
-        `'''#''' # b`,
-        `'''#'''`,
-    )
-    testTrimLineComment(
-        `"""#""" # b`,
-        `"""#"""`,
-    )
-    testTrimLineComment(
-        String.raw`"'#\"#" # b`,
-        String.raw`"'#\"#"`,
-    )
-    testTrimLineComment(
-        `"""'#"#""" # b`,
-        `"""'#"#"""`,
+    testInputOutput(p._testing.trimLineComment)(
+        [["a # b"], "a"],
+        [["a"], "a"],
+        [["'#' # b"], "'#'"],
+        [[`"#" # b`], `"#"`],
+        [[`'''#''' # b`], `'''#'''`],
+        [[`"""#""" # b`], `"""#"""`],
+        [[String.raw`"'#\"#" # b`], String.raw`"'#\"#"`],
+        [[`"""'#"#""" # b`], `"""'#"#"""`],
     )
 })
 
 describe("parseDict", () => {
-    test("key-value pairs", () => {
-        expect(p.parseDict(`
+    testInputOutputWithTitle(p._testing.parseDict)({
+        "key-value pairs": [[`
 dict_name = {
     "key1": value1,
     "key2": value2
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [
                 { key: "key1", value: "value1" },
                 { key: "key2", value: "value2" },
             ],
             err: [],
-        })
-    })
-
-    test("ignore comments", () => {
-        expect(p.parseDict(`
+        }],
+        "ignore comments": [[`
 dict_name = {
     "key1": value1,  # comment
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [{ key: "key1", value: "value1" }],
             err: [],
-        })
-    })
-
-    test("ignore whitespace around last comma", () => {
-        expect(p.parseDict(`
+        }],
+        "ignore whitespace around last comma": [[`
 dict_name = {
     "key1": value1  ,  # comment
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [{ key: "key1", value: "value1" }],
             err: [],
-        })
-    })
-
-    test("multi-line list literals", () => {
-        expect(p.parseDict(`
+        }],
+        "multi-line list literals": [[`
 dict_name = {
     "key1": [  # comment
         "a",   # comment
         "b"    # comment
     ],         # comment
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [{ key: "key1", value: `["a","b"]` }],
             err: [],
-        })
-    })
-
-    test("function calls", () => {
-        expect(p.parseDict(`
+        }],
+        "function calls": [[`
 dict_name = {
     "key1": func("a", "b") # comment
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [{ key: "key1", value: `func("a", "b")` }],
             err: [],
-        })
-    })
-
-    test("multi-line function calls", () => {
-        expect(p.parseDict(`
+        }],
+        "multi-line function calls": [[`
 dict_name = {
     "key1": func(  # comment
         "a",   # comment
         "b"    # comment
     ),         # comment
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [{ key: "key1", value: `func("a","b")` }],
             err: [],
-        })
-    })
-
-    test("comments containing double quotes", () => {
-        expect(p.parseDict(`
+        }],
+        "comments containing double quotes": [[`
 dict_name = {
     "key": value,  # "foo" 'bar'
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [{ key: "key", value: `value` }],
             err: [],
-        })
-    })
-
-    test("hash sign in a string literal", () => {
-        expect(p.parseDict(`
+        }],
+        "hash sign in a string literal": [[`
 dict_name = {
     "value": "#000000",
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [{ key: "value", value: `"#000000"` }],
             err: [],
-        })
-    })
-
-    test("parse error 1", () => {
-        expect(p.parseDict(`
+        }],
+        "parse error 1": [[`
 dict_name = {
     "a": "b",
 }
-`, 'aa')).toEqual({
+`, 'aa'], {
             result: [],
             err: [`Parse error: "aa" does not exist`],
-        })
-    })
-
-    test("parse error 2", () => {
-        expect(p.parseDict(`
+        }],
+        "parse error 2": [[`
 dict_name = {
     test
 }
-`, 'dict_name')).toEqual({
+`, 'dict_name'], {
             result: [],
             err: [`Parse error: "test"`],
-        })
+        }],
     })
 })
 
 describe('parseValidator', () => {
     describe("type checking", () => {
-        const accept = (/** @type {string} */type, /** @type {string} */value) => {
-            test(`accept ${value}: ${type}`, () => { expect(p.parseValidator(type).check(value)).toEqual(true) })
-        }
-        const reject = (/** @type {string} */type, /** @type {string} */value) => {
-            test(`reject ${value}: ${type}`, () => { expect(p.parseValidator(type).check(value)).toEqual(false) })
-        }
+        const accepted = true
+        const rejected = false
+        testInputOutput((/** @type {string} */type, /** @type {string} */value) => p._testing.parseValidator(type).check(value))(
+            [["validate_floatlist", "1, 2.3, 4"], accepted],
+            [["validate_floatlist", ""], accepted],
+            [["validate_floatlist", "a, b"], rejected],
+            [["validate_floatlist", "a"], rejected],
 
-        accept("validate_floatlist", "1, 2.3, 4")
-        accept("validate_floatlist", "")
-        reject("validate_floatlist", "a, b")
-        reject("validate_floatlist", "a")
+            [["['a', 'bc']", "a"], accepted],
+            [["['a', 'bc']", "bc"], accepted],
+            [["['a', 'bc']", ""], rejected],
+            [["['a', 'bc']", "b"], rejected],
 
-        accept("['a', 'bc']", "a")
-        accept("['a', 'bc']", "bc")
-        reject("['a', 'bc']", "")
-        reject("['a', 'bc']", "b")
+            [["validate_float_or_None", "none"], accepted],
+            [["validate_float_or_None", "None"], accepted],
+            [["validate_float_or_None", "2.5"], accepted],
+            [["validate_float_or_None", ""], rejected],
+            [["validate_float_or_None", "aa"], rejected],
 
-        accept("validate_float_or_None", "none")
-        accept("validate_float_or_None", "None")
-        accept("validate_float_or_None", "2.5")
-        reject("validate_float_or_None", "")
-        reject("validate_float_or_None", "aa")
+            [["validate_int", "20"], accepted],
+            [["validate_int", "-100"], accepted],
+            [["validate_int", "0"], accepted],
+            [["validate_int", "20.5"], rejected],
+            [["validate_int", "a"], rejected],
+            [["validate_int", ""], rejected],
 
-        accept("validate_int", "20")
-        accept("validate_int", "-100")
-        accept("validate_int", "0")
-        reject("validate_int", "20.5")
-        reject("validate_int", "a")
-        reject("validate_int", "")
+            [[`_range_validators["0 <= x <= 1"]`, "0"], accepted],
+            [[`_range_validators["0 <= x <= 1"]`, "0.5"], accepted],
+            [[`_range_validators["0 <= x <= 1"]`, "1"], accepted],
+            [[`_range_validators["0 <= x <= 1"]`, "a"], rejected],
+            [[`_range_validators["0 <= x <= 1"]`, ""], rejected],
 
-        accept(`_range_validators["0 <= x <= 1"]`, "0")
-        accept(`_range_validators["0 <= x <= 1"]`, "0.5")
-        accept(`_range_validators["0 <= x <= 1"]`, "1")
-        reject(`_range_validators["0 <= x <= 1"]`, "a")
-        reject(`_range_validators["0 <= x <= 1"]`, "")
-
-        accept(`_range_validators["0 <= x < 1"]`, "0")
-        accept(`_range_validators["0 <= x < 1"]`, "0.5")
-        reject(`_range_validators["0 <= x < 1"]`, "1")
-        reject(`_range_validators["0 <= x < 1"]`, "a")
-        reject(`_range_validators["0 <= x < 1"]`, "")
+            [[`_range_validators["0 <= x < 1"]`, "0"], accepted],
+            [[`_range_validators["0 <= x < 1"]`, "0.5"], accepted],
+            [[`_range_validators["0 <= x < 1"]`, "1"], rejected],
+            [[`_range_validators["0 <= x < 1"]`, "a"], rejected],
+            [[`_range_validators["0 <= x < 1"]`, ""], rejected],
+        )
     })
     describe("color", () => {
-        const testIsColor = (/** @type {string} */type) => {
-            test(`${type} is not a subset of color`, () => { expect(p.parseValidator(type).color).toEqual(true) })
-        }
-        const testIsNotColor = (/** @type {string} */type) => {
-            test(`${type} is not a subset of color`, () => { expect(p.parseValidator(type).color).toEqual(false) })
-        }
-        testIsNotColor("validate_float")
-        testIsNotColor(`_range_validators["0 <= x < 1"]`)
-        testIsColor("validate_color")
-        testIsColor("validate_color_or_auto")
+        const isSupersetOfColorType = true
+        const isNotSupersetOfColorType = false
+        testInputOutput((/** @type {string} */type) => p._testing.parseValidator(type).color)(
+            [["validate_color"], isSupersetOfColorType],
+            [["validate_color_or_auto"], isSupersetOfColorType],
+            [["validate_float"], isNotSupersetOfColorType],
+            [[`_range_validators["0 <= x < 1"]`], isNotSupersetOfColorType],
+        )
     })
     describe("label", () => {
-        const testLabel = (/** @type {string} */type, /** @type {string} */text) => {
-            test(type, () => { expect(p.parseValidator(type).label).toEqual(text) })
-        }
-        testLabel(`["a", "bc"]`, `"a" | "bc"`)
-        testLabel("validate_string", `str`)
-        testLabel("validate_int", `int`)
-        testLabel(`_range_validators["0 <= x <= 1"]`, `float (0 <= x <= 1)`)
-        testLabel("validate_floatlist", `list[float]`)
-        testLabel("validate_undefinedtype", `undefinedtype (any)`)
-        testLabel("validate_foo", `foo (any)`)
-        testLabel("foo", `foo (any)`)
-        testLabel(`_listify_validator(validate_int, n=3)`, `list[int] (len=3)`)
-        testLabel(`_listify_validator(validate_int, allow_stringlist=True)`, `str | list[int]`)
+        testInputOutput((/** @type {string} */type) => p._testing.parseValidator(type).label)(
+            [[`["a", "bc"]`], `"a" | "bc"`],
+            [["validate_string"], `str`],
+            [["validate_int"], `int`],
+            [[`_range_validators["0 <= x <= 1"]`], `float (0 <= x <= 1)`],
+            [["validate_floatlist"], `list[float]`],
+            [["validate_undefinedtype"], `undefinedtype (any)`],
+            [["validate_foo"], `foo (any)`],
+            [["foo"], `foo (any)`],
+            [[`_listify_validator(validate_int, n=3)`], `list[int] (len=3)`],
+            [[`_listify_validator(validate_int, allow_stringlist=True)`], `str | list[int]`],
+        )
     })
 })
 
