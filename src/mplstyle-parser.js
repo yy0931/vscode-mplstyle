@@ -34,27 +34,65 @@ exports.parseAll = (/** @type {string} */content) => {
     return { rc, errors }
 }
 
-/** @returns {Pair | null} */
+const findCommentStart = (/** @type {string} */s) => {
+    // https://github.com/timhoffm/matplotlib/blob/7c378a8f3f30ce57c874a851f3af8af58f1ffdf6/lib/matplotlib/cbook/__init__.py#L403
+    let insideDoubleQuote = false
+    for (let i = 0; i < s.length; i++) {
+        if (s[i] === '"') {
+            insideDoubleQuote = !insideDoubleQuote
+        }
+        if (!insideDoubleQuote && s[i] === "#") {
+            return i
+        }
+    }
+    return null
+}
+
+/** `countLeadingSpaces("  foo") == 2`, `countLeadingSpaces("  ") == 0` */
+const countLeadingSpaces = (/** @type {string} */s) => s.trim() === "" ? 0 : s.length - s.trimStart().length
+
+/**
+ * https://github.com/timhoffm/matplotlib/blob/7c378a8f3f30ce57c874a851f3af8af58f1ffdf6/lib/matplotlib/__init__.py#L782-L799
+ * @returns {Pair | null}
+ */
 const parseLine = exports.parseLine = (/** @type {string} */line) => {
-    const commentStart = line.indexOf("#")
-    line = (commentStart === -1 ? line : line.slice(0, commentStart)).trimEnd()
-    const start = line.length - line.trimStart().length
-    line = line.trimStart()
-    if (line === '') {
+    //          v valueStart
+    //             v valueEnd
+    // ` foo : "bar"  # comment `
+    //      ^ keyEnd  ^ commentStart
+    //   ^ keyStart
+    const commentStart = findCommentStart(line)
+    line = commentStart === null ? line : line.slice(0, commentStart)
+
+    if (line.trimStart() === '') {  // `# comment`
         return null
     }
 
     const colon = line.indexOf(":")
-    if (colon === -1) {
-        return { key: { text: line, start, end: start + line.length }, value: null, commentStart: null }
+    if (colon === -1) {  // `foo  # comment`
+        const keyStart = countLeadingSpaces(line)
+        const keyEnd = line.trimEnd().length
+        return { key: { text: line.slice(keyStart, keyEnd), start: keyStart, end: keyEnd }, value: null, commentStart }
     }
 
-    const key = line.slice(0, colon).trimEnd()
-    const value = line.slice(colon + 1)
+    const keyStart = countLeadingSpaces(line.slice(0, colon))
+    const keyEnd = line.slice(0, colon).trimEnd().length
+
+    let valueStart = colon + 1 + countLeadingSpaces(line.slice(colon + 1))
+    let valueEnd = line.trimEnd().length
+
+    // Remove double quotes
+    if (line[valueStart] === '"' && line[valueEnd - 1] === '"'
+        && valueStart !== valueEnd - 1 // TODO: The current matplotlib implementation does not have this check https://github.com/timhoffm/matplotlib/blob/7c378a8f3f30ce57c874a851f3af8af58f1ffdf6/lib/matplotlib/__init__.py#L794-L795
+    ) {
+        valueStart += 1
+        valueEnd -= 1
+    }
+
     return {
-        key: { text: key, start, end: start + key.length },
-        value: { text: value.trimStart(), start: start + colon + 1 + (value.length - value.trimStart().length), end: start + line.length },
-        commentStart: commentStart === -1 ? null : commentStart,
+        key: { text: line.slice(keyStart, keyEnd), start: keyStart, end: keyEnd },
+        value: { text: line.slice(valueStart, valueEnd), start: valueStart, end: valueEnd },
+        commentStart,
     }
 }
 
@@ -103,6 +141,26 @@ exports.parseColor = (/** @type {string} */value, /** @type {Map<string, readonl
             parseInt(value.slice(2, 4), 16) / 255,
             parseInt(value.slice(4, 6), 16) / 255,
             parseInt(value.slice(6, 8), 16) / 255,
+        ]
+    }
+
+    // #FFFFFF
+    if (/^#[a-f0-9]{6}$/i.test(value)) {
+        return [
+            parseInt(value.slice(1, 3), 16) / 255,
+            parseInt(value.slice(3, 5), 16) / 255,
+            parseInt(value.slice(5, 7), 16) / 255,
+            1.0,
+        ]
+    }
+
+    // FFFFFFFF
+    if (/^#[a-f0-9]{8}$/i.test(value)) {
+        return [
+            parseInt(value.slice(1, 3), 16) / 255,
+            parseInt(value.slice(3, 5), 16) / 255,
+            parseInt(value.slice(5, 7), 16) / 255,
+            parseInt(value.slice(7, 9), 16) / 255,
         ]
     }
 

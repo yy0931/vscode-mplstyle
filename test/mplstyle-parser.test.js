@@ -27,11 +27,36 @@ describe("parseLine", () => {
         }],
         [["#### MATPLOTLIBRC FORMAT"], null],
         [[" "], null],
+        [[":"], {
+            key: { text: "", start: 0, end: 0 },
+            value: { text: "", start: 1, end: 1 },
+            commentStart: null,
+        }],
+        [["  :  # aa "], {
+            key: { text: "", start: 0, end: 0 },
+            value: { text: "", start: 3, end: 3 },
+            commentStart: 5,
+        }],
         [["key"], {
             key: { text: "key", start: 0, end: 3 },
             value: null,
             commentStart: null,
-        }]
+        }],
+        [["key  # comment"], {
+            key: { text: "key", start: 0, end: 3 },
+            value: null,
+            commentStart: 5,
+        }],
+        [[`a: "b"`], {
+            key: { text: "a", start: 0, end: 1 },
+            value: { text: "b", start: 4, end: 5 },
+            commentStart: null,
+        }],
+        [[`a: "b #" # c`], {
+            key: { text: "a", start: 0, end: 1 },
+            value: { text: "b #", start: 4, end: 7 },
+            commentStart: 9,
+        }],
     )
 })
 
@@ -86,6 +111,8 @@ describe("parseColor", () => {
     testInputOutput((/** @type {string} */input) => p.parseColor(input, colorMap))(
         [["red"], [1, 0, 0, 1]],
         [["00ff00"], [0, 1, 0, 1]],
-        [["00ff0000"], [0, 1, 0, 0]],
+        [["#00ff00"], [0, 1, 0, 1]],
+        [["00ff00ff"], [0, 1, 0, 1]],
+        [["#00ff00ff"], [0, 1, 0, 1]],
     )
 })
