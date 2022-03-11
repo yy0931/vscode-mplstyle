@@ -32,7 +32,7 @@
 		"onWebviewPanel:mplstylePreview"
 	],
 	"main": "./src/extension.js",
-	"browser": "./browser/extension.js",
+	"browser": "./browser.js",
 	"contributes": {
 		"languages": [
 			{
@@ -137,11 +137,11 @@
 		}
 	},
 	"scripts": {
-		"webpack": "npx webpack",
+		"build:browser": "esbuild --bundle src/extension.js --outfile=./browser.js --define:process.env.browser=true --external:vscode --target=esnext --format=cjs --analyze",
 		"prepare": "python3 scripts/generate_documentation_images.py && npm i @vscode/webview-ui-toolkit@0.8.2 --prefix webview-ui-toolkit && cp webview-ui-toolkit/node_modules/@vscode/webview-ui-toolkit/dist/toolkit.min.js src/preview/webview-ui-toolkit.min.js && rimraf webview-ui-toolkit",
-		"vscode:prepublish": "npm run webpack && python3 scripts/generate_documentation_images.py",
+		"vscode:prepublish": "npm run build:browser && python3 scripts/generate_documentation_images.py",
 		"test": "jest",
-		"test-web": "npm run webpack && npx @vscode/test-web --extensionDevelopmentPath=."
+		"test:browser": "npm run build:browser && vscode-test-web --extensionDevelopmentPath=."
 	},
 	"dependencies": {
 		"@vscode/codicons": "^0.0.26",
@@ -154,13 +154,11 @@
 		"@types/node": "^16.11.6",
 		"@types/vscode": "^1.60.0",
 		"@types/which": "^2.0.1",
-		"@vscode/test-web": "^0.0.15",
+		"@vscode/test-web": "^0.0.22",
+		"esbuild": "^0.14.25",
 		"jest": "^27.5.1",
 		"rimraf": "^3.0.2",
-		"terser-webpack-plugin": "^5.2.4",
 		"vscode-oniguruma": "^1.6.2",
-		"vscode-textmate": "^6.0.0",
-		"webpack": "^5.62.1",
-		"webpack-cli": "^4.9.1"
+		"vscode-textmate": "^6.0.0"
 	}
 }

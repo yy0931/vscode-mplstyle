@@ -100,7 +100,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
     logger.info(`extensionUri: ${context.extensionUri}`)
 
-    if (!process.env.WEBPACKED) {
+    if (!process.env.browser) {
         logger.info(`platform: Node.js`)
         context.subscriptions.push(new (require("./preview/main_process").Previewer)(context.extensionUri, context.extensionPath, logger))
     } else {

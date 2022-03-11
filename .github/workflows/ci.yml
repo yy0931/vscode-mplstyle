@@ -28,8 +28,8 @@ jobs:
           python3 ./scripts/dump_color_map.py
           git diff --name-only --exit-code matplotlib
 
-      - name: Test webpack build
-        run: npm run webpack
+      - name: Test `npm run build:browser`
+        run: npm run build:browser
 
   test_example_scripts:
     runs-on: ubuntu-latest
