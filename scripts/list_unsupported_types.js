@@ -1,4 +1,4 @@
-const parseMplSource = require('../src/mpl_source_parser')
+const { parseMplSource } = require("../src/rcsetup-parser")
 const path = require("path")
 const fs = require("fs").promises
 
