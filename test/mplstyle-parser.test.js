@@ -1,6 +1,6 @@
 const fs = require("fs")
 const path = require("path")
-const p = require("../src/parser")
+const p = require("../src/mplstyle-parser")
 const { testInputOutput, testInputOutputWithTitle } = require("./helper")
 
 describe("parseLine", () => {

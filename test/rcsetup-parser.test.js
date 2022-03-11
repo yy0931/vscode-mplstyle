@@ -1,7 +1,7 @@
 const { spawnSync } = require("child_process")
 const fs = require("fs")
 const path = require("path")
-const p = require("../src/documentation-generator/parse-rcsetup.py")
+const p = require("../src/rcsetup-parser")
 const { testInputOutput, testInputOutputWithTitle } = require("./helper")
 
 describe("trimLineComment", () => {

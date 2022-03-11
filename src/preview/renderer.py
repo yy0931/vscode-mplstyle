@@ -44,7 +44,7 @@ try:
     print(json.dumps({
         "svg": svg.getvalue().decode("utf-8"),
         "error": (logging_io.getvalue() + "\n" + "\n".join(warning_list)).strip(),
-        "version": f"Python {'.'.join(map(str, sys.version_info[:3]))}, Matplotlib {matplotlib.__version__}"
+        "version": f"Python {'.'.join(map(str, sys.version_info[:3]))}, Matplotlib {matplotlib.__version__}"  # type: ignore
     }))
 except Exception as err:
     import traceback

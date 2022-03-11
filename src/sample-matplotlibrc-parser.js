@@ -1,5 +1,8 @@
-const parseMplstyle = require("../parser")
+const parseMplstyle = require("./mplstyle-parser")
 
+/**
+ * Parses [matplotlib/lib/matplotlib/mpl-data/matplotlibrc](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/mpl-data/matplotlibrc#L1)
+ */
 module.exports = (/** @type {string} */content) => {
     /** @typedef {[commentStart: string[], subheading: (() => string[]), section: string[]]} LazyComment */
     /** @type {Map<string, { exampleValue: string, comment: LazyComment }>} */

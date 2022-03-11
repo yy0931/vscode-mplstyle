@@ -1,5 +1,67 @@
 const json5 = require("json5")
-const parseMatplotlibrc = require("./parse-matplotlibrc")
+const parseMatplotlibrc = require("./sample-matplotlibrc-parser")
+
+/**
+ * Parses [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1), which defines the list of runtime configuration parameters and their possible values.
+ * @type {<Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, keywords?: { none: string, bool: string[] }) => Promise<{ params: Map<string, Type>, cyclerProps: Map<string, Type>, documentation: Map<string, { exampleValue: string; comment: string }>, errors: string[] }>}
+ */
+exports.parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile, isNOENT, keywords) => {
+    // Read and parse matplotlib/rcsetup.py
+    const useDefaultPath = !matplotlibPath
+    const matplotlibDirectory = useDefaultPath ? joinPaths(extensionPath, "matplotlib") : matplotlibPath
+
+    /** @type {string[]} */
+    const errors = []
+
+    /** @returns {Promise<{ err: string } | { content: string }>} */
+    const readMatplotlibFile = async (/** @type {string[]} */filepaths) => {
+        for (const filepath of filepaths) {
+            try {
+                const content = await readFile(joinPaths(matplotlibDirectory, filepath))
+                if (content === "") {
+                    continue
+                }
+                return { content }
+            } catch (err) {
+                if (isNOENT(err)) {
+                    continue
+                }
+                console.error(err)
+                return { err: err + "" }
+            }
+        }
+        return { err: `${filepaths.length >= 2 ? "neither of " : ""}"${filepaths.map((v) => joinPaths(matplotlibDirectory, v).toString()).join(" nor ")}" does not exist. ${useDefaultPath ? "Please reinstall the extension" : 'Please clear or modify `mplstyle.hover.matplotlibPath`'}.` }
+    }
+
+    const withPrefix = (/** @type {string} */x) => [`lib/matplotlib/` + x, x]
+    const rcsetup = await readMatplotlibFile(withPrefix("rcsetup.py"))
+    if ("err" in rcsetup) {
+        return { params: new Map(), cyclerProps: new Map(), documentation: new Map(), errors: [...errors, rcsetup.err] }
+    }
+    const validators = parseDict(rcsetup.content, '_validators')
+    errors.push(...validators.err.map((v) => `Error during parsing rcsetup.py: ${v}`))
+    const propValidators = parseDict(rcsetup.content, '_prop_validators')
+    errors.push(...propValidators.err.map((v) => `Error during parsing rcsetup.py: ${v}`))
+
+    // dirty fix
+    for (const item of validators.result) {
+        if (item.key === "ps.papersize") {
+            // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L1156-L1156
+            item.value = JSON.stringify(["auto", "letter", "legal", "ledger", ...Array(11).fill(0).map((_, i) => [`a${i}`, `b${i}`]).flat()])
+        }
+    }
+
+    const params = new Map(validators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
+    const cyclerProps = new Map(propValidators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
+
+    const matplotlibrc = await readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))
+    if ("err" in matplotlibrc) {
+        [matplotlibrc.err]
+        return { params, cyclerProps, documentation: new Map(), errors: [...errors, matplotlibrc.err] }
+    }
+
+    return { params, cyclerProps, documentation: parseMatplotlibrc(matplotlibrc.content), errors }
+}
 
 const json5Parse = (/** @type {string} */text) => {
     try {
@@ -41,6 +103,7 @@ const trimLineComment = (/** @type {string} */source) => {
 }
 
 /**
+ * Parses the definition of `_validators` and `_prop_validators` in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
  * @returns {{ result: { key: string, value: string }[], err: string[] }}
  */
 const parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
@@ -102,6 +165,7 @@ const matchExpr = (/** @type {string} */pattern, /** @type {string} */source) =>
 const r = String.raw.bind(String)
 
 /**
+ * Parses a validator name used in _validators in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
  * @typedef {{ readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }} Type
  * @returns {Type}
  */
@@ -283,65 +347,6 @@ const parseValidator = (/** @type {string} */source, /** @type {{ none: string, 
     } else {
         return makeType({ label: `${source} (any)`, check: any })
     }
-}
-
-/** @type {<Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, keywords?: { none: string, bool: string[] }) => Promise<{ params: Map<string, Type>, cyclerProps: Map<string, Type>, documentation: Map<string, { exampleValue: string; comment: string }>, errors: string[] }>} */
-exports.parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile, isNOENT, keywords) => {
-    // Read and parse matplotlib/rcsetup.py
-    const useDefaultPath = !matplotlibPath
-    const matplotlibDirectory = useDefaultPath ? joinPaths(extensionPath, "matplotlib") : matplotlibPath
-
-    /** @type {string[]} */
-    const errors = []
-
-    /** @returns {Promise<{ err: string } | { content: string }>} */
-    const readMatplotlibFile = async (/** @type {string[]} */filepaths) => {
-        for (const filepath of filepaths) {
-            try {
-                const content = await readFile(joinPaths(matplotlibDirectory, filepath))
-                if (content === "") {
-                    continue
-                }
-                return { content }
-            } catch (err) {
-                if (isNOENT(err)) {
-                    continue
-                }
-                console.error(err)
-                return { err: err + "" }
-            }
-        }
-        return { err: `${filepaths.length >= 2 ? "neither of " : ""}"${filepaths.map((v) => joinPaths(matplotlibDirectory, v).toString()).join(" nor ")}" does not exist. ${useDefaultPath ? "Please reinstall the extension" : 'Please clear or modify `mplstyle.hover.matplotlibPath`'}.` }
-    }
-
-    const withPrefix = (/** @type {string} */x) => [`lib/matplotlib/` + x, x]
-    const rcsetup = await readMatplotlibFile(withPrefix("rcsetup.py"))
-    if ("err" in rcsetup) {
-        return { params: new Map(), cyclerProps: new Map(), documentation: new Map(), errors: [...errors, rcsetup.err] }
-    }
-    const validators = parseDict(rcsetup.content, '_validators')
-    errors.push(...validators.err.map((v) => `Error during parsing rcsetup.py: ${v}`))
-    const propValidators = parseDict(rcsetup.content, '_prop_validators')
-    errors.push(...propValidators.err.map((v) => `Error during parsing rcsetup.py: ${v}`))
-
-    // dirty fix
-    for (const item of validators.result) {
-        if (item.key === "ps.papersize") {
-            // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L1156-L1156
-            item.value = JSON.stringify(["auto", "letter", "legal", "ledger", ...Array(11).fill(0).map((_, i) => [`a${i}`, `b${i}`]).flat()])
-        }
-    }
-
-    const params = new Map(validators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
-    const cyclerProps = new Map(propValidators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
-
-    const matplotlibrc = await readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))
-    if ("err" in matplotlibrc) {
-        [matplotlibrc.err]
-        return { params, cyclerProps, documentation: new Map(), errors: [...errors, matplotlibrc.err] }
-    }
-
-    return { params, cyclerProps, documentation: parseMatplotlibrc(matplotlibrc.content), errors }
 }
 
 exports._testing = { trimLineComment, parseDict, parseValidator }
