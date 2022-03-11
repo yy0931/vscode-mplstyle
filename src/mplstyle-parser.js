@@ -154,7 +154,7 @@ exports.parseColor = (/** @type {string} */value, /** @type {Map<string, readonl
         ]
     }
 
-    // FFFFFFFF
+    // #FFFFFFFF
     if (/^#[a-f0-9]{8}$/i.test(value)) {
         return [
             parseInt(value.slice(1, 3), 16) / 255,
