@@ -9,3 +9,4 @@ scripts/**
 .github/**
 **/__pycache__/**
 .vscode-test-web/
+src/**/*.ts

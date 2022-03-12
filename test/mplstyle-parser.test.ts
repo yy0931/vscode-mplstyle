@@ -1,7 +1,7 @@
-const fs = require("fs")
-const path = require("path")
-const p = require("../src/mplstyle-parser")
-const { testInputOutput, testInputOutputWithTitle } = require("./helper")
+import fs from "fs"
+import path from "path"
+import * as p from "../src/mplstyle-parser"
+import { testInputOutput, testInputOutputWithTitle } from "./helper"
 
 describe("parseLine", () => {
     testInputOutput(p.parseLine)(
@@ -67,7 +67,7 @@ describe('parseAll', () => {
         expect(rc.get("key1")?.[0]?.pair.value?.text).toEqual("value1")
         expect(rc.get("key2")?.[0]?.pair.value?.text).toEqual("value2")
     })
-    testInputOutputWithTitle((/** @type {string} */input) => p.parseAll(input).errors)({
+    testInputOutputWithTitle((input: string) => p.parseAll(input).errors)({
         "missing colon": [[`key1 value1`], [{
             error: "Missing colon",
             severity: "Error",
@@ -107,8 +107,8 @@ describe("findRcParamsInPythonFiles", () => {
 })
 
 describe("parseColor", () => {
-    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(fs.readFileSync(path.join(__dirname, "../matplotlib", "color_map.json")).toString()))))
-    testInputOutput((/** @type {string} */input) => p.parseColor(input, colorMap))(
+    const colorMap = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, "../matplotlib", "color_map.json")).toString()) as Record<string, readonly [number, number, number, number]>))
+    testInputOutput((input: string) => p.parseColor(input, colorMap))(
         [["red"], [1, 0, 0, 1]],
         [["00ff00"], [0, 1, 0, 1]],
         [["#00ff00"], [0, 1, 0, 1]],

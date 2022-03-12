@@ -1,8 +1,8 @@
-const { parseMplSource } = require("../src/rcsetup-parser")
-const path = require("path")
-const fs = require("fs").promises
+import { parseMplSource } from "../src/rcsetup-parser"
+import path from "path"
+import fs from "fs/promises"
 
-const isNOENT = (/** @type {unknown} */ err) => err instanceof Error && /** @type {any} */(err).code == "ENOENT"
+const isNOENT = (err: unknown) => err instanceof Error && (err as any).code == "ENOENT"
 
 const main = async () => {
     const { params, cyclerProps, errors } = await parseMplSource(path.dirname(__dirname), undefined, path.join, (filepath) => fs.readFile(filepath).then((v) => v.toString()), isNOENT)

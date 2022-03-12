@@ -1,4 +1,4 @@
-const parseMatplotlibrc = require("../src/sample-matplotlibrc-parser")
+import parseMatplotlibrc from "../src/sample-matplotlibrc-parser"
 
 describe("parseMatplotlibrc", () => {
     test("multi-line comments", () => {

@@ -1,8 +1,8 @@
-const { spawnSync } = require("child_process")
-const fs = require("fs")
-const path = require("path")
-const p = require("../src/rcsetup-parser")
-const { testInputOutput, testInputOutputWithTitle } = require("./helper")
+import { spawnSync } from "child_process"
+import fs from "fs"
+import path from "path"
+import * as p from "../src/rcsetup-parser"
+import { testInputOutput, testInputOutputWithTitle } from "./helper"
 
 describe("trimLineComment", () => {
     testInputOutput(p._testing.trimLineComment)(
@@ -116,7 +116,7 @@ describe('parseValidator', () => {
     describe("type checking", () => {
         const accepted = true
         const rejected = false
-        testInputOutput((/** @type {string} */type, /** @type {string} */value) => p._testing.parseValidator(type).check(value))(
+        testInputOutput((type: string, value: string) => p._testing.parseValidator(type).check(value))(
             [["validate_floatlist", "1, 2.3, 4"], accepted],
             [["validate_floatlist", ""], accepted],
             [["validate_floatlist", "a, b"], rejected],
@@ -156,7 +156,7 @@ describe('parseValidator', () => {
     describe("color", () => {
         const isSupersetOfColorType = true
         const isNotSupersetOfColorType = false
-        testInputOutput((/** @type {string} */type) => p._testing.parseValidator(type).color)(
+        testInputOutput((type: string) => p._testing.parseValidator(type).color)(
             [["validate_color"], isSupersetOfColorType],
             [["validate_color_or_auto"], isSupersetOfColorType],
             [["validate_float"], isNotSupersetOfColorType],
@@ -164,7 +164,7 @@ describe('parseValidator', () => {
         )
     })
     describe("label", () => {
-        testInputOutput((/** @type {string} */type) => p._testing.parseValidator(type).label)(
+        testInputOutput((type: string) => p._testing.parseValidator(type).label)(
             [[`["a", "bc"]`], `"a" | "bc"`],
             [["validate_string"], `str`],
             [["validate_int"], `int`],
@@ -179,8 +179,8 @@ describe('parseValidator', () => {
     })
 })
 
-const readFile = async (/** @type {string} */ filepath) => fs.promises.readFile(filepath).then((v) => v.toString())
-const isNOENT = (/** @type {any} */ err) => err.code == "ENOENT"
+const readFile = async (filepath: string) => fs.promises.readFile(filepath).then((v) => v.toString())
+const isNOENT = (err: any) => err.code == "ENOENT"
 
 describe("parseMplSource", () => {
     test("test", async () => {
@@ -217,6 +217,6 @@ describe("parseMplSource", () => {
     }, 20 * 1000)
 
     test("NOENT", async () => {
-        expect((await p.parseMplSource(/** @type {string} */("noent"), undefined, (a, b) => path.join(a, b), readFile, isNOENT)).errors[0]).toContain('does not exist')
+        expect((await p.parseMplSource("noent" as string, undefined, (a, b) => path.join(a, b), readFile, isNOENT)).errors[0]).toContain('does not exist')
     })
 })

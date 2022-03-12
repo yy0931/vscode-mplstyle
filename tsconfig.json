@@ -2,8 +2,9 @@
 	"compilerOptions": {
 		"module": "commonJS",
 		"target": "ESNext",
-		"checkJs": true,
-		"strict": true
+		"strict": true,
+		"esModuleInterop": true,
+		"noImplicitAny": true
 	},
 	"include": ["src", "scripts", "test"]
 }

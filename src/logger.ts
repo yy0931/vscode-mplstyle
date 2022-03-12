@@ -1,6 +1,6 @@
-const vscode = require("vscode")
+import vscode from "vscode"
 
-module.exports = class Logger {
+export default class Logger {
     #outputChannel
 
     constructor() {
@@ -11,8 +11,7 @@ module.exports = class Logger {
         this.#outputChannel.dispose()
     }
 
-    /** @type {<T>(f: () => Promise<T>) => Promise<T | undefined>} */
-    async try(f) {
+    async try<T>(f: () => Promise<T>): Promise<T | undefined> {
         try {
             return await f()
         } catch (err) {
@@ -24,8 +23,7 @@ module.exports = class Logger {
         }
     }
 
-    /** @type {<T>(f: () => T) => T | undefined} */
-    trySync(f) {
+    trySync<T>(f: () => T): T | undefined {
         try {
             const out = f()
             if (out instanceof Promise) {
@@ -37,13 +35,13 @@ module.exports = class Logger {
         }
     }
 
-    info(/** @type {string} */ message) {
+    info(message: string) {
         this.#outputChannel.appendLine(`[Info] ${message}`)
     }
-    warning(/** @type {string} */message) {
+    warning(message: string) {
         this.#outputChannel.appendLine(`[Warning]${message}`)
     }
-    error(/** @type {string | Error} */message) {
+    error(message: string | Error) {
         if (message instanceof Error && message.stack !== undefined) {
             message = message.stack
         }

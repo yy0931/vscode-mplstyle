@@ -1,7 +1,8 @@
 jest.mock("vscode", () => ({}), { virtual: true })
 
-const { _testing: { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler } } = require("../src/extension")
-const { testInputOutput, testInputOutputWithTitle } = require("./helper")
+import { _testing } from "../src/extension"
+const { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler } = _testing
+import { testInputOutput, testInputOutputWithTitle } from "./helper"
 
 describe("formatLine", () => {
     testInputOutput(formatLine)(
@@ -37,7 +38,7 @@ foo.bar: string
 \`\`\`
 `
     }
-    testInputOutputWithTitle((/** @type {boolean} */showImage) => generateDocumentationForKey("foo.bar", {
+    testInputOutputWithTitle((showImage: boolean) => generateDocumentationForKey("foo.bar", {
         images: new Map([["foo.bar", "image-uri"]]),
         showImage,
         mpl: {

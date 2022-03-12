@@ -1,13 +1,12 @@
-const fs = require("fs")
-const path = require("path")
-const vscode = require("vscode")
-const which = require("which")
-const tmp = require("tmp")
-const { spawnSync } = require("child_process")
-const Logger = require("../logger")
+import fs from "fs"
+import path from "path"
+import vscode from "vscode"
+import which from "which"
+import tmp from "tmp"
+import { spawnSync } from "child_process"
+import Logger from "../logger"
 
-/** @returns {string | null} */
-const findPythonExecutable = () => {
+const findPythonExecutable = (): string | null => {
     for (const pythonPath of [
         which.sync("python3", { nothrow: true }),
         which.sync("py", { nothrow: true }),      // Windows
@@ -20,19 +19,19 @@ const findPythonExecutable = () => {
     return null
 }
 
-/** @typedef {{ label: string; path: string }} Plot */
-/** @returns {Plot[]} */
-const listPlots = (/** @type {string} */extensionPath) => {
+type Plot = { label: string; path: string }
+
+const listPlots = (extensionPath: string): Plot[] => {
     const exampleDir = path.join(extensionPath, "matplotlib", "examples")
     return [
-        .../** @type {string[]} */(vscode.workspace.getConfiguration("mplstyle").get("preview.userPlots")).map((p) => ({ label: path.basename(p), path: p })),
+        ...(vscode.workspace.getConfiguration("mplstyle").get("preview.userPlots") as string[]).map((p) => ({ label: path.basename(p), path: p })),
         ...fs.readdirSync(exampleDir)
             .filter((name) => name.endsWith(".py"))
             .map((name) => ({ label: name.slice(0, -".py".length), path: path.join(exampleDir, name) })),
     ]
 }
 
-const jsonParse = (/** @type {string} */text) => {
+const jsonParse = (text: string) => {
     try {
         return JSON.parse(text)
     } catch (err) {
@@ -41,17 +40,18 @@ const jsonParse = (/** @type {string} */text) => {
     }
 }
 
-/** @typedef {{ svg?: string, error: string, version?: string, plots: Plot[], activePlot: Plot, uri: string }} WebviewState */
-/** @typedef {{ activePlot?: Plot, viewSource?: true, log?: string, loaded?: true, edit?: true }} WebviewMessage */
-/** @typedef {{ panel: vscode.WebviewPanel, state: { activePlot: Plot, uri: string } }} Panel */
-class Previewer {
-    /** @readonly @type {Map<string, Panel>} */#panels
-    /** @readonly @type {{ dispose(): void }[]} */#subscriptions
-    /** @readonly @type {vscode.Uri} */#extensionUri
-    /** @readonly @type {string} */#extensionPath
-    /** @readonly @type {Logger} */#logger
+export type WebviewState = { svg?: string, error: string, version?: string, plots: Plot[], activePlot: Plot, uri: string }
+export type WebviewMessage = { activePlot?: Plot, viewSource?: true, log?: string, loaded?: true, edit?: true }
+type Panel = { panel: vscode.WebviewPanel, state: { activePlot: Plot, uri: string } }
 
-    constructor(/** @type {vscode.Uri} */extensionUri, /** @type {string} */extensionPath, /** @type {Logger} */ logger) {
+export class Previewer {
+    #panels: Map<string, Panel>
+    #subscriptions: { dispose(): void }[]
+    #extensionUri: vscode.Uri
+    #extensionPath: string
+    #logger: Logger
+
+    constructor(extensionUri: vscode.Uri, extensionPath: string, logger: Logger) {
         this.#extensionUri = extensionUri
         this.#extensionPath = extensionPath
         this.#panels = new Map()
@@ -73,7 +73,7 @@ class Previewer {
                     return fs.readFileSync(uri.path).toString()
                 })
             }),
-            vscode.window.registerWebviewPanelSerializer("mplstylePreview", /** @type {vscode.WebviewPanelSerializer<WebviewState>} */({
+            vscode.window.registerWebviewPanelSerializer("mplstylePreview", {
                 deserializeWebviewPanel: async (panel, state) => this.#logger.try(async () => {
                     this.#logger.info(`deserializeWebviewPanel (title = ${panel.title}, uri = ${state.uri})`)
                     const editor = vscode.window.visibleTextEditors.find((editor) => editor.document.uri.toString() === state.uri.toString())
@@ -85,7 +85,7 @@ class Previewer {
                     this.#initPanel({ panel, state: { activePlot: state.activePlot, uri: state.uri } }, editor.document)
                         .catch((err) => this.#logger.error(err))
                 }),
-            })),
+            } as vscode.WebviewPanelSerializer<WebviewState>),
             vscode.languages.registerCodeLensProvider({ language: "mplstyle" }, {
                 provideCodeLenses(document) {
                     return logger.trySync(() => {
@@ -99,16 +99,14 @@ class Previewer {
             }),
         ]
     }
-    /** @returns {Promise<Panel>} */
-    async #initPanel(/** @type {Panel} */panel, /** @type {vscode.TextDocument} */document) {
+    async #initPanel(panel: Panel, document: vscode.TextDocument): Promise<Panel> {
         this.#panels.set(panel.state.uri.toString(), panel)
         panel.panel.onDidDispose(() => {
             this.#logger.info(`The panel for ${panel.state.uri} has been closed`)
             this.#panels.delete(panel.state.uri.toString())
         }, null, this.#subscriptions)
-        /** @type {Promise<Panel>} */
-        const p = new Promise((resolve) => {
-            panel.panel.webview.onDidReceiveMessage((/** @type {WebviewMessage} */data) => this.#logger.try(async () => {
+        const p: Promise<Panel> = new Promise((resolve) => {
+            panel.panel.webview.onDidReceiveMessage((data: WebviewMessage) => this.#logger.try(async () => {
                 this.#logger.info(`Received a message (uri = ${panel.state.uri}): ${JSON.stringify(data)}`)
                 if (data.activePlot) {
                     panel.state.activePlot = data.activePlot
@@ -132,17 +130,17 @@ class Previewer {
         })
         panel.panel.webview.html = fs.readFileSync(path.join(this.#extensionPath, "src", "preview", "webview.html")).toString()
             .replaceAll("{{cspSource}}", panel.panel.webview.cspSource)
-            .replaceAll("{{webviewUIToolkit}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview-ui-toolkit.min.js")).toString())
+            .replaceAll("{{webviewUIToolkit}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview-ui-toolkit.js")).toString())
             .replaceAll("{{webview.js}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, "src", "preview", "webview.js")).toString())
             .replaceAll("{{codicons}}", panel.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.#extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')).toString())
         return p
     }
-    async render(/** @type {vscode.TextDocument} */document) {
+    async render(document: vscode.TextDocument) {
         this.#logger.info(`Previewer.render (uri = ${document.uri}, languageId = ${document.languageId})`)
         if (document.languageId !== "mplstyle") { return }
 
         // Get a python executable
-        const python = /** @type {string | undefined} */(vscode.workspace.getConfiguration("mplstyle").get("preview.pythonPath")) || findPythonExecutable()
+        const python = (vscode.workspace.getConfiguration("mplstyle").get("preview.pythonPath")) || findPythonExecutable()
         if (typeof python !== "string" || python === "") {
             this.#logger.error("Could not find a Python executable. Specify the path to it in the `mplstyle.preview.pythonPath` configuration if you have a Python executable.")
             return
@@ -207,5 +205,3 @@ class Previewer {
         this.#subscriptions.length = 0
     }
 }
-
-exports.Previewer = Previewer

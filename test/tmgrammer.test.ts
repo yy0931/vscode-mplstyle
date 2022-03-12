@@ -1,17 +1,16 @@
-const vscodeTextmate = require("vscode-textmate")
-const oniguruma = require("vscode-oniguruma")
-const fs = require("fs")
-const path = require("path")
+import * as vscodeTextmate from "vscode-textmate"
+import * as oniguruma from "vscode-oniguruma"
+import fs from "fs"
+import path from "path"
 
-/** @type {vscodeTextmate.Registry | null} */
-let textmateRegistry = null
+let textmateRegistry: vscodeTextmate.Registry | null = null
 
-const tokenize = async (/** @type {string} */source) => {
+const tokenize = async (source: string) => {
     if (textmateRegistry === null) {
         textmateRegistry = new vscodeTextmate.Registry({
             onigLib: oniguruma.loadWASM((await fs.promises.readFile(path.join(__dirname, "../node_modules/vscode-oniguruma/release/onig.wasm"))).buffer).then(() => ({
-                createOnigScanner(/** @type {string[]} */ patterns) { return new oniguruma.OnigScanner(patterns) },
-                createOnigString(/** @type {string} */s) { return new oniguruma.OnigString(s) }
+                createOnigScanner(/** @type {string[]} */ patterns: string[]) { return new oniguruma.OnigScanner(patterns) },
+                createOnigString(s) { return new oniguruma.OnigString(s) }
             })),
             loadGrammar: async (scopeName) => {
                 if (scopeName === "source.mplstyle") {
@@ -25,7 +24,7 @@ const tokenize = async (/** @type {string} */source) => {
     const grammar = await textmateRegistry.loadGrammar("source.mplstyle")
     if (grammar === null) { fail() }
     /** @type {{ token: string, scopes: string[] }[]} */
-    const result = []
+    const result: { token: string; scopes: string[] }[] = []
     let ruleStack = vscodeTextmate.INITIAL
     for (const [lineNumber, line] of source.split("\n").entries()) {
         const lineTokens = grammar.tokenizeLine(line, ruleStack)

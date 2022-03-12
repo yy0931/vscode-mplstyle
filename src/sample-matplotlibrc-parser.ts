@@ -1,14 +1,12 @@
-const parseMplstyle = require("./mplstyle-parser")
+import * as parseMplstyle from "./mplstyle-parser"
 
 /**
  * Parses [matplotlib/lib/matplotlib/mpl-data/matplotlibrc](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/mpl-data/matplotlibrc#L1)
  */
-module.exports = (/** @type {string} */content) => {
-    /** @typedef {[commentStart: string[], subheading: (() => string[]), section: string[]]} LazyComment */
-    /** @type {Map<string, { exampleValue: string, comment: LazyComment }>} */
-    const entries = new Map()
-    /** @type {string | null} */
-    let lastKey = null
+export default (content: string) => {
+    type LazyComment = [commentStart: string[], subheading: (() => string[]), section: string[]]
+    const entries: Map<string, { exampleValue: string; comment: LazyComment }> = new Map()
+    let lastKey: string | null = null
 
     /**
      * ```
@@ -17,12 +15,9 @@ module.exports = (/** @type {string} */content) => {
      * ## **********
      * ## body
      * ```
-     * @type {Map<string, string>}
      */
-    /** @type {null | { title: string, body: string }} */
-    let sectionHeader = null
-    /** @type {null | { title: string, body: string }} */
-    let sectionHeaderBuf = null
+    let sectionHeader: null | { title: string; body: string } = null
+    let sectionHeaderBuf: null | { title: string; body: string } = null
 
     /**
      * ```
@@ -31,9 +26,8 @@ module.exports = (/** @type {string} */content) => {
      * target1: value1
      * target2: value2
      * ```
-     * @type {{ body: string[], target: string[] }}
      */
-    let subheading = { body: [], target: [] }
+    let subheading: { body: string[]; target: string[] } = { body: [], target: [] }
 
     const lines = content.replaceAll("\r", "").split("\n")
     for (let i = 0; i < lines.length; i++) {
@@ -99,8 +93,8 @@ module.exports = (/** @type {string} */content) => {
                     console.log(`Parse error: ${line}`)
                     continue
                 }
-                /** @type {LazyComment} */
-                const comment = [[], () => [], []]
+
+                const comment: LazyComment = [[], () => [], []]
                 if (pair.commentStart !== null) {
                     comment[0] = ([line.slice(pair.commentStart + 1).trim()])
                 }
@@ -136,6 +130,6 @@ module.exports = (/** @type {string} */content) => {
     }
     return new Map(Array.from(entries.entries()).map(([k, v]) => [k, {
         exampleValue: v.exampleValue,
-        comment: v.comment.map((v) => Array.isArray(v) ? v : v()).filter((v) => v.length > 0).map(/** @returns {string[]} */(v, i) => [...(i === 0 ? [] : ["", "---"]), ...v]).flat().join("\n"),
+        comment: v.comment.map((v) => Array.isArray(v) ? v : v()).filter((v) => v.length > 0).map((v, i): string[] => [...(i === 0 ? [] : ["", "---"]), ...v]).flat().join("\n"),
     }]))
 }

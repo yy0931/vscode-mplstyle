@@ -1,20 +1,17 @@
-const json5 = require("json5")
-const parseMatplotlibrc = require("./sample-matplotlibrc-parser")
+import json5 from "json5"
+import parseMatplotlibrc from "./sample-matplotlibrc-parser"
 
 /**
  * Parses [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1), which defines the list of runtime configuration parameters and their possible values.
- * @type {<Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, keywords?: { none: string, bool: string[] }) => Promise<{ params: Map<string, Type>, cyclerProps: Map<string, Type>, documentation: Map<string, { exampleValue: string; comment: string }>, errors: string[] }>}
  */
-exports.parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFile, isNOENT, keywords) => {
+export const parseMplSource = async <Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, keywords?: { none: string, bool: string[] }): Promise<{ params: Map<string, Type>; cyclerProps: Map<string, Type>; documentation: Map<string, { exampleValue: string; comment: string }>; errors: string[] }> => {
     // Read and parse matplotlib/rcsetup.py
     const useDefaultPath = !matplotlibPath
     const matplotlibDirectory = useDefaultPath ? joinPaths(extensionPath, "matplotlib") : matplotlibPath
 
-    /** @type {string[]} */
-    const errors = []
+    const errors: string[] = []
 
-    /** @returns {Promise<{ err: string } | { content: string }>} */
-    const readMatplotlibFile = async (/** @type {string[]} */filepaths) => {
+    const readMatplotlibFile = async (filepaths: string[]): Promise<{ err: string } | { content: string }> => {
         for (const filepath of filepaths) {
             try {
                 const content = await readFile(joinPaths(matplotlibDirectory, filepath))
@@ -33,7 +30,7 @@ exports.parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFi
         return { err: `${filepaths.length >= 2 ? "neither of " : ""}"${filepaths.map((v) => joinPaths(matplotlibDirectory, v).toString()).join(" nor ")}" does not exist. ${useDefaultPath ? "Please reinstall the extension" : 'Please clear or modify `mplstyle.hover.matplotlibPath`'}.` }
     }
 
-    const withPrefix = (/** @type {string} */x) => [`lib/matplotlib/` + x, x]
+    const withPrefix = (x: string) => [`lib/matplotlib/` + x, x]
     const rcsetup = await readMatplotlibFile(withPrefix("rcsetup.py"))
     if ("err" in rcsetup) {
         return { params: new Map(), cyclerProps: new Map(), documentation: new Map(), errors: [...errors, rcsetup.err] }
@@ -63,7 +60,7 @@ exports.parseMplSource = async (extensionPath, matplotlibPath, joinPaths, readFi
     return { params, cyclerProps, documentation: parseMatplotlibrc(matplotlibrc.content), errors }
 }
 
-const json5Parse = (/** @type {string} */text) => {
+const json5Parse = (text: string) => {
     try {
         return json5.parse(text)
     } catch (err) {
@@ -72,11 +69,11 @@ const json5Parse = (/** @type {string} */text) => {
 }
 
 /** https://stackoverflow.com/a/3561711/10710682 */
-const escapeRegExp = (/** @type {string} */string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+const escapeRegExp = (string: string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
 
-const trimLineComment = (/** @type {string} */source) => {
-    /** @type {string} */
-    let strLiteral = ""
+const trimLineComment = (source: string) => {
+
+    let strLiteral: string = ""
     for (let i = 0; i < source.length; i++) {
         const char = source[i]
         if (strLiteral === "") {
@@ -106,7 +103,7 @@ const trimLineComment = (/** @type {string} */source) => {
  * Parses the definition of `_validators` and `_prop_validators` in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
  * @returns {{ result: { key: string, value: string }[], err: string[] }}
  */
-const parseDict = (/** @type {string} */content, /** @type {string} */ variableNamePattern) => {
+const parseDict = (content: string, variableNamePattern: string): { result: { key: string; value: string }[]; err: string[] } => {
     content = content.replace(/\r/g, "")
     const replaced = content.replace(new RegExp(String.raw`^(.|\n)*\n\s*${variableNamePattern}\s*=\s*\{\n`), "") // remove the code before `_validators = {`
     if (content === replaced) {
@@ -114,10 +111,8 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableN
     }
     content = replaced
 
-    /** @type {{ readonly value: string, readonly key: string }[]} */
-    const result = []
-    /** @type {string[]} */
-    const err = []
+    const result: { readonly value: string; readonly key: string }[] = []
+    const err: string[] = []
     const lines = content.split("\n").map((line) => line.trim())
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
@@ -126,8 +121,7 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableN
             break
         }
 
-        /** @type {RegExpExecArray | null} */
-        let matches = null
+        let matches: RegExpExecArray | null = null
         // Parse `"foo.bar": validator, # comment`_
         if (matches = /^\s*["']([\w\-_]+(?:\.[\w\-_]+)*)["']\s*:\s*(.*)$/.exec(line)) {
             const key = matches[1]
@@ -158,28 +152,27 @@ const parseDict = (/** @type {string} */content, /** @type {string} */ variableN
     return { result, err }
 }
 
-const matchExpr = (/** @type {string} */pattern, /** @type {string} */source) => {
+const matchExpr = (pattern: string, source: string) => {
     return new RegExp(String.raw`^${pattern}$`).exec(source)
 }
 
 const r = String.raw.bind(String)
 
+type Type = { readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }
+
 /**
  * Parses a validator name used in _validators in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
- * @typedef {{ readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }} Type
- * @returns {Type}
  */
-const parseValidator = (/** @type {string} */source, /** @type {{ none: string, bool: string[] }} */keywords = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }) => {
-    /** @type {(x: { readonly label: string, check: Type["check"] } & Partial<Type>) => Type} */
-    const makeType = (x) => ({ constants: [], color: false, shortLabel: x.label, ...x })
+const parseValidator = (source: string, keywords: { none: string; bool: string[] } = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }): Type => {
+    const makeType: (x: { readonly label: string; check: Type["check"] } & Partial<Type>) => Type = (x): Type => ({ constants: [], color: false, shortLabel: x.label, ...x })
 
     /** case insensitive. All values must be lowercase. */
-    const makeEnum = (/** @type {string[]} */values, /** @type {boolean} */caseSensitive) => {
+    const makeEnum = (values: string[], caseSensitive: boolean = false) => {
         const valuesForCheck = caseSensitive ? values : values.map((v) => v.toLowerCase())
         return makeType({ label: values.map((x) => JSON.stringify(x)).join(" | "), check: (x) => valuesForCheck.includes(caseSensitive ? x : x.toLowerCase()), constants: values })
     }
 
-    const makeList = (/** @type {Type} */child, /** @type {number | null} */len, /** @type {boolean} */allow_stringlist) => {
+    const makeList = (child: Type, len: number | null, allow_stringlist: boolean) => {
         const left = (allow_stringlist ? "str | " : "") + "list["
         const right = "]" + (len === null ? '' : ` (len=${len})`)
         return makeType({
@@ -191,7 +184,7 @@ const parseValidator = (/** @type {string} */source, /** @type {{ none: string, 
         })
     }
 
-    const orEnum = (/** @type {Type} */base, /** @type {string[]} */values, /** @type {boolean} */caseSensitive) => {
+    const orEnum = (base: Type, values: string[], caseSensitive: boolean = false) => {
         const valuesForCheck = caseSensitive ? values : values.map((v) => v.toLowerCase())
         return makeType({
             shortLabel: `${values.map((v) => JSON.stringify(v)).join(" | ")} | ${base.shortLabel}`,
@@ -202,10 +195,10 @@ const parseValidator = (/** @type {string} */source, /** @type {{ none: string, 
         })
     }
 
-    const any = (/** @type {string} */x) => true
+    const any = (x: string) => true
 
-    /** @type {RegExpExecArray | null} */
-    let matches = null
+
+    let matches: RegExpExecArray | null = null
     if (matches = matchExpr(r`_?validate_(\w+)`, source)) {                 // validate_bool, validate_float, _validate_linestyle, _validate_pathlike, etc.
         const type = matches[1]
         if (type.endsWith("_or_None")) {
@@ -340,7 +333,7 @@ const parseValidator = (/** @type {string} */source, /** @type {{ none: string, 
             return makeType({ label: `${source} (any)`, check: any })
         }
     } else if (matches = matchExpr(r`_listify_validator\(([^\)]+?)(?:,\s*n=(\d+)\s*)?(?:,\s*allow_stringlist=(True|False)\s*)?\)`, source)) { // _listify_validator(validate_int, n=2)
-        const len = /** @type {string | undefined} */(matches[2])
+        const len = (matches[2])
         return makeList(parseValidator(matches[1]), len === undefined ? null : +len, matches[3] === "True")
     } else if (matches = matchExpr(r`_ignorecase\(([^\)]+)\)`, source)) {
         return parseValidator(matches[1])
@@ -349,4 +342,4 @@ const parseValidator = (/** @type {string} */source, /** @type {{ none: string, 
     }
 }
 
-exports._testing = { trimLineComment, parseDict, parseValidator }
+export const _testing = { trimLineComment, parseDict, parseValidator }

@@ -1,14 +1,13 @@
-const vscode = require("vscode")
-const Logger = require("./logger")
-const mplstyleParser = require("./mplstyle-parser")
-const { parseMplSource } = require("./rcsetup-parser")
+import vscode from "vscode"
+import Logger from "./logger"
+import * as mplstyleParser from "./mplstyle-parser"
+import { parseMplSource } from "./rcsetup-parser"
 
-const formatLine = (/** @type {string} */line) => {
+const formatLine = (line: string) => {
     const pair = mplstyleParser.parseLine(line)
     if (pair === null) { return [] }
 
-    /** @type {({ edit: "delete", start: number, end: number } | { edit: "replace", start: number, end: number, replacement: string })[]} */
-    const edits = []
+    const edits: ({ edit: "delete"; start: number; end: number } | { edit: "replace"; start: number; end: number; replacement: string })[] = []
 
     // `  a: b` -> `a: b`
     if (pair.key.start > 0) {
@@ -23,7 +22,7 @@ const formatLine = (/** @type {string} */line) => {
     return edits
 }
 
-const toHex = (/** @type {readonly [number, number, number, number]} */color) => {
+const toHex = (color: readonly [number, number, number, number]) => {
     return ("00" + Math.floor(color[0] * 255).toString(16).toUpperCase()).slice(-2) +
         ("00" + Math.floor(color[1] * 255).toString(16).toUpperCase()).slice(-2) +
         ("00" + Math.floor(color[2] * 255).toString(16).toUpperCase()).slice(-2) +
@@ -33,11 +32,11 @@ const toHex = (/** @type {readonly [number, number, number, number]} */color) =>
 /**
  * Generate a documentation for a runtime configuration parameter name
  */
-const generateDocumentationForKey = (/** @type {string} */key, /** @type {{
+const generateDocumentationForKey = (key: string, options: {
     mpl: Pick<Awaited<ReturnType<typeof parseMplSource>>, "params" | "documentation">
     images: Map<string, string>
     showImage: boolean
-}} */options) => {
+}) => {
     const type = options.mpl.params.get(key)
     if (type === undefined) {
         return null
@@ -62,7 +61,7 @@ const generateDocumentationForKey = (/** @type {string} */key, /** @type {{
 /**
  * Generate a documentation for `cycler()`
  */
-const generateDocumentationForCycler = (/** @type {Pick<Awaited<ReturnType<typeof parseMplSource>>, "cyclerProps">} */mpl) => ({
+const generateDocumentationForCycler = (mpl: Pick<Awaited<ReturnType<typeof parseMplSource>>, "cyclerProps">) => ({
     detail: {
         form2: {
             param1: `label: ${Array.from(mpl.cyclerProps.keys()).map((v) => JSON.stringify(v)).join(" | ")}`,
@@ -75,34 +74,33 @@ const generateDocumentationForCycler = (/** @type {Pick<Awaited<ReturnType<typeo
     documentation: "Creates a `cycler.Cycler` which cycles over one or more colors simultaneously.",
 })
 
-exports._testing = { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler }
+export const _testing = { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler }
 
-const readFile = async (/** @type {vscode.Uri} */ filepath) => vscode.workspace.fs.readFile(filepath).then((v) => new TextDecoder().decode(v))
-const isNOENT = (/** @type {unknown} */ err) => err instanceof vscode.FileSystemError && ["FileNotFound", "FileIsADirectory", "NoPermissions"].includes(err.code)
+const readFile = async (filepath: vscode.Uri) => vscode.workspace.fs.readFile(filepath).then((v) => new TextDecoder().decode(v))
+const isNOENT = (err: unknown) => err instanceof vscode.FileSystemError && ["FileNotFound", "FileIsADirectory", "NoPermissions"].includes(err.code)
 
 const getMatplotlibPathConfig = () => {
     const value = vscode.workspace.getConfiguration("mplstyle").get("hover.matplotlibPath")
-    if (value === undefined || value === "") {
+    if (value === undefined || typeof value !== "string" || value === "") {
         return undefined
     }
     return vscode.Uri.file(value)
 }
 
-/** @returns {{ none: string, bool: string[] }} */
-const getKeywords = () => {
-    const none = vscode.workspace.getConfiguration("mplstyle").get("completion.keywords.none")
-    const bool = vscode.workspace.getConfiguration("mplstyle").get("completion.keywords.bool")
+const getKeywords = (): { none: string; bool: string[] } => {
+    const none = vscode.workspace.getConfiguration("mplstyle").get<string>("completion.keywords.none")!
+    const bool = vscode.workspace.getConfiguration("mplstyle").get<string[]>("completion.keywords.bool")!
     return { none, bool }
 }
 
-exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
+export const activate = async (context: vscode.ExtensionContext) => {
     const logger = new Logger()
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
     logger.info(`extensionUri: ${context.extensionUri}`)
 
     if (!process.env.browser) {
         logger.info(`platform: Node.js`)
-        context.subscriptions.push(new (require("./preview/main_process").Previewer)(context.extensionUri, context.extensionPath, logger))
+        context.subscriptions.push(new ((await import("./preview/main_process")).Previewer)(context.extensionUri, context.extensionPath, logger))
     } else {
         logger.info(`platform: browser`)
         context.subscriptions.push(vscode.commands.registerCommand("mplstyle.preview", () => logger.try(async () => {
@@ -116,7 +114,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
-    const colorMap = new Map(Object.entries(/** @type {Record<string, readonly [number, number, number, number]>} */(JSON.parse(await readFile(vscode.Uri.joinPath(context.extensionUri, "matplotlib", "color_map.json"))))))
+    const colorMap = new Map(Object.entries(JSON.parse(await readFile(vscode.Uri.joinPath(context.extensionUri, "matplotlib", "color_map.json"))) as Record<string, readonly [number, number, number, number]>))
     logger.info(`The number of color names: ${colorMap.size}`)
 
     const imageDir = vscode.Uri.joinPath(context.extensionUri, "example")
@@ -130,7 +128,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             return
         }
         const { rc, errors } = mplstyleParser.parseAll(editor.document.getText())
-        errors.push(...Array.from(rc.values()).flat().flatMap(/** @returns {{ error: string, severity: import("./mplstyle-parser").Severity, line: number, columnStart: number, columnEnd: number }[]} */({ pair, line }) => {
+        errors.push(...Array.from(rc.values()).flat().flatMap(({ pair, line }): { error: string; severity: mplstyleParser.Severity; line: number; columnStart: number; columnEnd: number }[] => {
             if (pair.value === null) { return [] }  // missing semicolon
             const type = mpl.params.get(pair.key.text)
             if (type === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
@@ -220,7 +218,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
             return logger.trySync(() => {
                 for (const match of mplstyleParser.findRcParamsInPythonFiles(document.lineAt(position.line).text)) {
                     if (!(match.index <= position.character && position.character <= match.index + match.key.length)) { continue }
-                    const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true
+                    const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get<boolean>("hover.showImages") ?? true
                     return Array.from(mpl.params.keys()).flatMap((key) => {
                         const item = new vscode.CompletionItem(key, vscode.CompletionItemKind.Property)
                         const docs = generateDocumentationForKey(key, { showImage: showComparisonImage, images, mpl })
@@ -250,7 +248,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                         item.detail = "constant"
                         return item
                     })
-                    const colors = (/** @type {string} */quotation, /** @type {vscode.Range | undefined} */range) => Array.from(colorMap.entries()).map(([k, v]) => {
+                    const colors = (quotation: string, range?: vscode.Range) => Array.from(colorMap.entries()).map(([k, v]) => {
                         const item = new vscode.CompletionItem(quotation + k + quotation, vscode.CompletionItemKind.Color)
                         item.detail = "#" + toHex(v)
                         if (range !== undefined) { item.range = range }
@@ -278,8 +276,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     return items
                 } else {
                     // Key
-                    /** @type {boolean} */
-                    const showComparisonImage = vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true
+                    const showComparisonImage: boolean = vscode.workspace.getConfiguration("mplstyle").get("hover.showImages") ?? true
                     return Array.from(mpl.params.entries()).flatMap(([key, type]) => {
                         const docs = generateDocumentationForKey(key, { showImage: showComparisonImage, images, mpl })
                         if (docs === null) { return [] }
@@ -326,8 +323,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
                     if (/^\s*cycler\(\w+=/.test(pair.value.text)) {
                         // keyword arguments
                         h.activeSignature = 1
-                        /** @type {string | null} */
-                        let keywordArgName = null
+                        let keywordArgName: string | null = null
                         for (const matches of textLine.text.matchAll(/[(,]\s*(\w+)\s*=/g)) {
                             if (matches.index === undefined || matches.index >= position.character) { break }
                             keywordArgName = matches[1]
@@ -351,8 +347,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     context.subscriptions.push(vscode.languages.registerColorProvider({ language: "mplstyle" }, {
         provideDocumentColors(document) {
             return logger.trySync(() => {
-                /** @type {vscode.ColorInformation[]} */
-                const result = []
+                const result: vscode.ColorInformation[] = []
                 for (const { pair, line } of Array.from(mplstyleParser.parseAll(document.getText()).rc.values()).flat()) {
                     const type = mpl.params.get(pair.key.text)
                     if (type === undefined || pair.value === null) { continue }
@@ -384,7 +379,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
         }
     }))
 
-    const mapEdits = (/** @type {ReturnType<typeof formatLine>} */ edits, /** @type {number} */line) => edits.map((v) => v.edit === "delete" ? vscode.TextEdit.delete(new vscode.Range(line, v.start, line, v.end)) : vscode.TextEdit.replace(new vscode.Range(line, v.start, line, v.end), v.replacement))
+    const mapEdits = (edits: ReturnType<typeof formatLine>, line: number) => edits.map((v) => v.edit === "delete" ? vscode.TextEdit.delete(new vscode.Range(line, v.start, line, v.end)) : vscode.TextEdit.replace(new vscode.Range(line, v.start, line, v.end), v.replacement))
     context.subscriptions.push(vscode.languages.registerDocumentRangeFormattingEditProvider({ language: "mplstyle" }, {
         provideDocumentRangeFormattingEdits(document, range) {
             const edits = []
@@ -396,8 +391,7 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }))
     context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider({ language: "mplstyle" }, {
         provideDocumentFormattingEdits(document) {
-            /** @type {vscode.TextEdit[]} */
-            const edits = []
+            const edits: vscode.TextEdit[] = []
             for (let i = 0; i < document.lineCount; i++) {
                 edits.push(...mapEdits(formatLine(document.lineAt(i).text), i))
             }
@@ -406,4 +400,4 @@ exports.activate = async (/** @type {vscode.ExtensionContext} */context) => {
     }))
 }
 
-exports.deactivate = () => { }
+export const deactivate = () => { }

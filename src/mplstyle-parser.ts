@@ -1,20 +1,17 @@
-const json5 = require("json5")
+import json5 from "json5"
 
-/** @typedef {{
- *      key: { text: string, start: number, end: number }
- *      value: { text: string, start: number, end: number } | null
- *      commentStart: number | null
- *  }} Pair
- */
-/** @typedef {"Error" | "Warning"} Severity */
+export type Pair = {
+    key: { text: string, start: number, end: number }
+    value: { text: string, start: number, end: number } | null
+    commentStart: number | null
+}
+export type Severity = "Error" | "Warning"
 
 /** https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/__init__.py#L724-L724 */
-exports.parseAll = (/** @type {string} */content) => {
-    /** @type {Map<string, { readonly pair: Pair, readonly line: number }[]>} */
-    const rc = new Map()
+export const parseAll = (content: string) => {
+    const rc: Map<string, { readonly pair: Pair; readonly line: number }[]> = new Map()
 
-    /** @type {{ error: string, severity: Severity, line: number, columnStart: number, columnEnd: number }[]} */
-    const errors = []
+    const errors: { error: string; severity: Severity; line: number; columnStart: number; columnEnd: number }[] = []
 
     for (const [lineNumber, line] of content.replaceAll('\r', '').split('\n').entries()) {
         const pair = parseLine(line)
@@ -34,7 +31,7 @@ exports.parseAll = (/** @type {string} */content) => {
     return { rc, errors }
 }
 
-const findCommentStart = (/** @type {string} */s) => {
+const findCommentStart = (s: string) => {
     // https://github.com/timhoffm/matplotlib/blob/7c378a8f3f30ce57c874a851f3af8af58f1ffdf6/lib/matplotlib/cbook/__init__.py#L403
     let insideDoubleQuote = false
     for (let i = 0; i < s.length; i++) {
@@ -49,13 +46,13 @@ const findCommentStart = (/** @type {string} */s) => {
 }
 
 /** `countLeadingSpaces("  foo") == 2`, `countLeadingSpaces("  ") == 0` */
-const countLeadingSpaces = (/** @type {string} */s) => s.trim() === "" ? 0 : s.length - s.trimStart().length
+const countLeadingSpaces = (s: string) => s.trim() === "" ? 0 : s.length - s.trimStart().length
 
 /**
  * https://github.com/timhoffm/matplotlib/blob/7c378a8f3f30ce57c874a851f3af8af58f1ffdf6/lib/matplotlib/__init__.py#L782-L799
  * @returns {Pair | null}
  */
-const parseLine = exports.parseLine = (/** @type {string} */line) => {
+export const parseLine = (line: string): Pair | null => {
     //          v valueStart
     //             v valueEnd
     // ` foo : "bar"  # comment `
@@ -96,10 +93,8 @@ const parseLine = exports.parseLine = (/** @type {string} */line) => {
     }
 }
 
-/** @returns {{ index: number, key: string }[]} */
-exports.findRcParamsInPythonFiles = (/** @type {string} */source) => {
-    /** @type {{ index: number, key: string }[]} */
-    const result = []
+export const findRcParamsInPythonFiles = (source: string): { index: number; key: string }[] => {
+    const result: { index: number; key: string }[] = []
     for (const matches of source.matchAll(/(?<=(?:matplotlib\.|mpl\.|matplotlib\.pyplot\.|plt\.|[^.]|^)\s*rcParams\s*\[\s*['"])(?<key>[^'"]*)/g)) {
         if (matches.index !== undefined && matches.groups?.key !== undefined) {
             result.push({ index: matches.index, key: matches.groups.key })
@@ -112,7 +107,7 @@ exports.findRcParamsInPythonFiles = (/** @type {string} */source) => {
  * https://github.com/matplotlib/matplotlib/blob/main/lib/matplotlib/colors.py#L195
  * @returns {readonly [r: number, g: number, b: number, a: number] | null}
  */
-exports.parseColor = (/** @type {string} */value, /** @type {Map<string, readonly [number, number, number, number]>} */colorMap) => {
+export const parseColor = (value: string, colorMap: Map<string, readonly [number, number, number, number]>): readonly [r: number, g: number, b: number, a: number] | null => {
     // none
     if (value.toLowerCase() === "none") {
         return [0, 0, 0, 0]
