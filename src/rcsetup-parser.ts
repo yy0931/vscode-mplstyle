@@ -101,7 +101,6 @@ const trimLineComment = (source: string) => {
 
 /**
  * Parses the definition of `_validators` and `_prop_validators` in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
- * @returns {{ result: { key: string, value: string }[], err: string[] }}
  */
 const parseDict = (content: string, variableNamePattern: string): { result: { key: string; value: string }[]; err: string[] } => {
     content = content.replace(/\r/g, "")
@@ -158,7 +157,7 @@ const matchExpr = (pattern: string, source: string) => {
 
 const r = String.raw.bind(String)
 
-type Type = { readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }
+export type Type = { readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }
 
 /**
  * Parses a validator name used in _validators in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).

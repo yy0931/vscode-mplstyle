@@ -49,8 +49,7 @@ const findCommentStart = (s: string) => {
 const countLeadingSpaces = (s: string) => s.trim() === "" ? 0 : s.length - s.trimStart().length
 
 /**
- * https://github.com/timhoffm/matplotlib/blob/7c378a8f3f30ce57c874a851f3af8af58f1ffdf6/lib/matplotlib/__init__.py#L782-L799
- * @returns {Pair | null}
+ * https://github.com/timhoffm/matplotlib/blob/7c378a8f3f30ce57c874a851f3af8af58f1ffdf6/lib/matplotlib/__init__.py#L782-L799z
  */
 export const parseLine = (line: string): Pair | null => {
     //          v valueStart
@@ -105,9 +104,8 @@ export const findRcParamsInPythonFiles = (source: string): { index: number; key:
 
 /**
  * https://github.com/matplotlib/matplotlib/blob/main/lib/matplotlib/colors.py#L195
- * @returns {readonly [r: number, g: number, b: number, a: number] | null}
  */
-export const parseColor = (value: string, colorMap: Map<string, readonly [number, number, number, number]>): readonly [r: number, g: number, b: number, a: number] | null => {
+export const parseColor = (value: string, colorMap: ReadonlyMap<string, readonly [number, number, number, number]>): readonly [r: number, g: number, b: number, a: number] | null => {
     // none
     if (value.toLowerCase() === "none") {
         return [0, 0, 0, 0]

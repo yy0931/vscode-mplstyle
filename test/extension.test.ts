@@ -1,8 +1,12 @@
 jest.mock("vscode", () => ({}), { virtual: true })
 
+import path from "path"
+import fs from "fs"
 import { _testing } from "../src/extension"
-const { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler } = _testing
+const { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler, findDocumentColorRanges } = _testing
+import { parseLine } from "../src/mplstyle-parser"
 import { testInputOutput, testInputOutputWithTitle } from "./helper"
+import { Type } from "../src/rcsetup-parser"
 
 describe("formatLine", () => {
     testInputOutput(formatLine)(
@@ -95,4 +99,42 @@ describe("generateDocumentationForCycler", () => {
             documentation: 'Creates a `cycler.Cycler` which cycles over one or more colors simultaneously.',
         }],
     })
+})
+
+describe("findDocumentColorRanges", () => {
+    const colors = `
+text.color: {red}
+text.color: {tab:red}
+text.color: {xkcd:red}
+text.color: {xkcd:red brown}
+text.color: {xkcd:fire engine red}
+text.color: "{red}"
+text.color: "{tab:red}"
+text.color: "{xkcd:fire engine red}"
+text.color: {0.40}
+text.color: {123456}
+text.color: {12345678}
+text.color: "{0.40}"
+text.color: "{123456}"
+text.color: "{#123456}"
+text.color: "{#12345678}"
+axes.prop_cycle: cycler(color=["{red}", "{tab:red}", "{xkcd:red brown}"])
+axes.prop_cycle: cycler(color=['{red}', '{tab:red}', '{xkcd:red brown}'])
+axes.prop_cycle: cycler(color=["{0.4}", "{123456}", "{12345678}", "{#123456}", "{#12345678}"])
+axes.prop_cycle: cycler(color=['{0.4}', '{123456}', '{12345678}'])
+`
+    const colorMap = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, "../matplotlib", "color_map.json")).toString()) as Record<string, readonly [number, number, number, number]>))
+    const params = new Map<string, Type>([
+        ["text.color", { color: true, check: (_) => true, constants: [], label: "color", shortLabel: "color" }],
+        ["axes.prop_cycle", { color: false, check: (_) => true, constants: [], label: "cycler", shortLabel: "cycler" }],
+    ])
+    for (const line of colors.trim().split("\n")) {
+        const input = line.replace(/[{}]/g, "")
+        test(input, () => {
+            const pair = parseLine(input)
+            if (pair === null) { throw new Error(`Parse error: ${input}`) }
+            expect(findDocumentColorRanges({ params }, colorMap, pair).map(([start, end, _color]) => input.slice(start, end)))
+                .toEqual(Array.from(line.matchAll(/\{([^}]*)\}/g), (m) => m[1]))  // Extract substrings between { and }
+        })
+    }
 })

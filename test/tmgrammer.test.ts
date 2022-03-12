@@ -9,7 +9,7 @@ const tokenize = async (source: string) => {
     if (textmateRegistry === null) {
         textmateRegistry = new vscodeTextmate.Registry({
             onigLib: oniguruma.loadWASM((await fs.promises.readFile(path.join(__dirname, "../node_modules/vscode-oniguruma/release/onig.wasm"))).buffer).then(() => ({
-                createOnigScanner(/** @type {string[]} */ patterns: string[]) { return new oniguruma.OnigScanner(patterns) },
+                createOnigScanner(patterns: string[]) { return new oniguruma.OnigScanner(patterns) },
                 createOnigString(s) { return new oniguruma.OnigString(s) }
             })),
             loadGrammar: async (scopeName) => {
@@ -23,7 +23,6 @@ const tokenize = async (source: string) => {
     }
     const grammar = await textmateRegistry.loadGrammar("source.mplstyle")
     if (grammar === null) { fail() }
-    /** @type {{ token: string, scopes: string[] }[]} */
     const result: { token: string; scopes: string[] }[] = []
     let ruleStack = vscodeTextmate.INITIAL
     for (const [lineNumber, line] of source.split("\n").entries()) {

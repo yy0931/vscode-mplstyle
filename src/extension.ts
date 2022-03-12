@@ -29,6 +29,34 @@ const toHex = (color: readonly [number, number, number, number]) => {
         (color[3] === 1 ? "" : ("00" + Math.floor(color[3] * 255).toString(16).toUpperCase()).slice(-2))
 }
 
+const findDocumentColorRanges = (
+    mpl: Pick<Awaited<ReturnType<typeof parseMplSource>>, "params">,
+    colorMap: ReadonlyMap<string, readonly [number, number, number, number]>,
+    pair: mplstyleParser.Pair,
+) => {
+    const type = mpl.params.get(pair.key.text)
+    if (type === undefined || pair.value === null) { return [] }
+    const result: [start: number, end: number, color: readonly [r: number, g: number, b: number, a: number]][] = []
+    const pushRange = (start: number, end: number) => {
+        const color = mplstyleParser.parseColor(pair.value!.text.slice(start - pair.value!.start, end - pair.value!.start), colorMap)
+        if (color !== null) {
+            result.push([start, end, color])
+        }
+    }
+
+    if (type.color) {
+        pushRange(pair.value.start, pair.value.end)
+    } else if (type.label === "cycler") {
+        // '0.40', 'E24A33', 'xkcd:acid green', etc.
+        for (const matches of pair.value.text.matchAll(/'[\w\d\-:. ]*'|"#?[\w\d\-:. ]*"/gi)) {
+            if (matches.index === undefined) { continue }
+            pushRange(pair.value.start + matches.index + 1, pair.value.start + matches.index + matches[0].length - 1)
+        }
+    }
+
+    return result
+}
+
 /**
  * Generate a documentation for a runtime configuration parameter name
  */
@@ -74,7 +102,7 @@ const generateDocumentationForCycler = (mpl: Pick<Awaited<ReturnType<typeof pars
     documentation: "Creates a `cycler.Cycler` which cycles over one or more colors simultaneously.",
 })
 
-export const _testing = { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler }
+export const _testing = { formatLine, toHex, generateDocumentationForKey, generateDocumentationForCycler, findDocumentColorRanges }
 
 const readFile = async (filepath: vscode.Uri) => vscode.workspace.fs.readFile(filepath).then((v) => new TextDecoder().decode(v))
 const isNOENT = (err: unknown) => err instanceof vscode.FileSystemError && ["FileNotFound", "FileIsADirectory", "NoPermissions"].includes(err.code)
@@ -349,26 +377,8 @@ export const activate = async (context: vscode.ExtensionContext) => {
             return logger.trySync(() => {
                 const result: vscode.ColorInformation[] = []
                 for (const { pair, line } of Array.from(mplstyleParser.parseAll(document.getText()).rc.values()).flat()) {
-                    const type = mpl.params.get(pair.key.text)
-                    if (type === undefined || pair.value === null) { continue }
-                    if (type.color) {
-                        const color = mplstyleParser.parseColor(pair.value.text, colorMap)
-                        if (color !== null) {
-                            result.push(new vscode.ColorInformation(new vscode.Range(line, pair.value.start, line, pair.value.end), new vscode.Color(...color)))
-                        }
-                    } else if (type.label === "cycler") {
-                        // '0.40', 'E24A33', 'xkcd:acid green', etc.
-                        const pattern = /'[\w\d\-:. ]*'|"[\w\d\-:. ]*"/gi
-                        for (const matches of pair.value.text.matchAll(pattern)) {
-                            if (matches.index === undefined) { continue }
-                            const color = mplstyleParser.parseColor(pair.value.text.slice(matches.index + 1, matches.index + matches[0].length - 1), colorMap)
-                            if (color !== null) {
-                                result.push(new vscode.ColorInformation(
-                                    new vscode.Range(line, pair.value.start + matches.index + 1, line, pair.value.start + matches.index + matches[0].length - 1),
-                                    new vscode.Color(...color),
-                                ))
-                            }
-                        }
+                    for (const [start, end, color] of findDocumentColorRanges(mpl, colorMap, pair)) {
+                        result.push(new vscode.ColorInformation(new vscode.Range(line, start, line, end), new vscode.Color(...color)))
                     }
                 }
                 return result
