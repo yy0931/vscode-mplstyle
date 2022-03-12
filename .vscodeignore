@@ -14,3 +14,4 @@ node_modules/
 test/
 jest.config.js
 SECURITY.md
+coverage/

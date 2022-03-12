@@ -10,3 +10,4 @@ __pycache__/
 coverage/
 src/**/*.js
 LICENSE-THIRD-PARTY.txt
+src/**/codicon.css
