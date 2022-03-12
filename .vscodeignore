@@ -15,3 +15,4 @@ test/
 jest.config.js
 SECURITY.md
 coverage/
+tsconfig.json
