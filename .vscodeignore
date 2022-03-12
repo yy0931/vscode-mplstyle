@@ -10,3 +10,7 @@ scripts/**
 **/__pycache__/**
 .vscode-test-web/
 src/**/*.ts
+node_modules/
+test/
+jest.config.js
+SECURITY.md

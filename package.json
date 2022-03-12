@@ -138,12 +138,12 @@
 	},
 	"scripts": {
 		"prepare": "python3 scripts/generate_documentation_images.py",
-		"build": "npm run build:webview && npm run build:node && npm run build:browser",
+		"build": "npm run build:webview && npm run build:node && npm run build:browser && license-checker --production --csv --out LICENSE-THIRD-PARTY.txt",
 		"build:webview": "esbuild --bundle src/preview/webview.ts --outfile=./src/preview/webview.js --target=esnext && npx shx cp node_modules/@vscode/webview-ui-toolkit/dist/toolkit.js src/preview/webview-ui-toolkit.js",
 		"build:node": "esbuild --bundle src/extension.ts --outfile=./src/extension__node.js --external:vscode --target=esnext --format=cjs --platform=node",
 		"build:browser": "esbuild --bundle src/extension.ts --outfile=./src/extension__browser.js --external:vscode --target=esnext --format=cjs --define:process.env.browser=true",
 		"clean": "npx shx rm -f 'src/**/*.js'",
-		"vscode:prepublish": "npm run build && python3 scripts/generate_documentation_images.py",
+		"vscode:prepublish": "npm run build",
 		"test": "jest",
 		"start-browser": "npm run build && vscode-test-web --extensionDevelopmentPath=."
 	},
@@ -162,6 +162,7 @@
 		"@types/which": "^2.0.1",
 		"@vscode/test-web": "^0.0.22",
 		"esbuild": "^0.14.25",
+		"license-checker": "^25.0.1",
 		"rimraf": "^3.0.2",
 		"shelljs": "^0.8.5",
 		"ts-jest": "^27.1.3",
