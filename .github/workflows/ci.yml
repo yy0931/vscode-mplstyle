@@ -25,7 +25,7 @@ jobs:
       - name: Check for updates of Matplotlib
         run: |
           ./scripts/update_matplotlib_source.sh
-          python3 ./scripts/dump_color_map.py
+          python3 ./scripts/update_color_map.py
           git diff --name-only --exit-code matplotlib
 
       - name: Test `npm run build:browser`

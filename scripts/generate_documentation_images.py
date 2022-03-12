@@ -88,7 +88,7 @@ def render_figure(plot_axes: Callable[[Axes, str], None], key: str, value: str, 
 
 shutil.rmtree(out_dir, ignore_errors=True)
 
-plt.style.use(Path(__file__).parent / 'default.mplstyle')
+plt.style.use(Path(__file__).parent / 'documentation-images.mplstyle')
 
 todo = """
 axes.autolimit_mode: round_numbers
@@ -125,6 +125,7 @@ def parse_config(config: str):
             k, v = pair.split(":", 1)
             values.append((k.strip(), v.strip()))
         yield values
+
 
 for values in parse_config("""
 axes.edgecolor: green; axes.linewidth: 1.5
