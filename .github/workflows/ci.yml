@@ -31,7 +31,7 @@ jobs:
       - name: Test `npm run build:browser`
         run: npm run build:browser
 
-  test_example_scripts:
+  test_renderer:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -45,9 +45,9 @@ jobs:
       run: |
         python3 -m pip uninstall -y matplotlib
         python3 -m pip install matplotlib --pre
-        ./scripts/test_examples.sh
+        ./test/renderer.test.sh
     - name: "stable-release"
       run: |
         python3 -m pip uninstall -y matplotlib
         python3 -m pip install matplotlib
-        ./scripts/test_examples.sh
+        ./test/renderer.test.sh
