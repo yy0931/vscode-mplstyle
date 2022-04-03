@@ -157,7 +157,16 @@ const matchExpr = (pattern: string, source: string) => {
 
 const r = String.raw.bind(String)
 
-export type Type = { readonly label: string, readonly shortLabel: string, readonly check: (value: string) => boolean, readonly constants: readonly string[], readonly color: boolean }
+export type Type = {
+    readonly label: string
+    readonly shortLabel: string
+    /** static type-checker */
+    readonly check: (value: string) => boolean
+    /** constants to be shown at code completion */
+    readonly constants: readonly string[]
+    /** whether the document color provider should parse the value */
+    readonly color: boolean
+}
 
 /**
  * Parses a validator name used in _validators in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
@@ -198,7 +207,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
 
 
     let matches: RegExpExecArray | null = null
-    if (matches = matchExpr(r`_?validate_(\w+)`, source)) {                 // validate_bool, validate_float, _validate_linestyle, _validate_pathlike, etc.
+    if (matches = matchExpr(r`_?validate_(\w+)`, source)) {  // validate_bool, validate_float, _validate_linestyle, _validate_pathlike, etc.
         const type = matches[1]
         if (type.endsWith("_or_None")) {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L181
@@ -209,7 +218,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
             return orEnum(parseValidator(source.slice(0, -"_None".length)), [keywords.none])
         }
         if (type.endsWith("list")) {
-            // key: val1, val2
+            // comma-separated list, e.g. `key: val1, val2`
             return makeList(parseValidator(source.slice(0, -"list".length)), null, false)
         }
 
@@ -220,79 +229,83 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
                 const values = ["-", "--", "-.", ":", " ", "solid", "dashed", "dashdot", "dotted", "none"]
                 return makeType({ shortLabel: type, label: '(offset (int), list["on" | "off"]) | list["on" | "off"] | ' + values.map((v) => JSON.stringify(v)).join(" | "), constants: values, check: (x) => true })
             case "dpi":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfvc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L163-L163
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L163
                 return makeType({ label: `int | "figure"`, check: (x) => x === "figure" || typeof json5Parse(x) === "number", constants: ["figure"] })
             case "fontsize":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L360-L360
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L360
                 return orEnum(parseValidator("validate_float"), ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'smaller', 'larger'], true)
             case "fontweight":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L378-L378
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L377
                 return orEnum(parseValidator("validate_float"), ['ultralight', 'light', 'normal', 'regular', 'book', 'medium', 'roman', 'semibold', 'demibold', 'demi', 'bold', 'heavy', 'extra bold', 'black'], true)
             case "bbox":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L519-L519
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L519
                 return makeEnum(["tight", "standard"], true)
             case "float":
                 return makeType({ label: "float", check: (x) => typeof json5Parse(x) === "number" })
             case "int": {
                 return makeType({ label: "int", check: (x) => { x = json5Parse(x); return typeof x === "number" && Number.isInteger(x) } })
             } case "bool":
-                // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L142-L142
+                // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L138
                 return makeType({ label: "bool", check: (x) => keywords.bool.map((v) => v.toLowerCase()).includes(x.toLowerCase()), constants: keywords.bool })
             case "string":
                 return makeType({ label: `str`, check: any })
             case "any":
                 return makeType({ label: `any`, check: any })
             case "dash":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L582-L582
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L581
                 return parseValidator(`validate_floatlist`)
             case "hatch": {
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L566-L566
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L565
                 return makeType({ label: String.raw`/[\\/|\-+*.xoO]*/`, check: (x) => x === "" || /[\\/|\-+*.xoO]*/.test(x) })
             } case "cmap":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L339-L339
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L339
                 return makeType({ label: type, check: any })
             case "fonttype":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L224-L224
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L224
                 return makeType({ label: type, check: any })
             case "pathlike":
                 return makeType({ label: type, check: any })
             case "aspect":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L344-L344
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L344
                 return orEnum(parseValidator("validate_float"), ["auto", "equal"], true)
             case "axisbelow":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L152
                 return orEnum(parseValidator("validate_bool"), ["line"], true)
             case "color":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L312-L312
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L310
                 return makeType({ label: `color | "C0"-"C9"`, check: any, color: true })
             case "color_or_auto":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L277-L277
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L276
                 return makeType({ label: `color | "C0"-"C9" | "auto"`, check: any, constants: ["auto"], color: true })
             case "color_for_prop_cycle":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L282-L282
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L282
                 return makeType({ label: 'color', check: any, color: true })
             case "color_or_inherit":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L269-L269
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L269
                 return makeType({ label: `color | "C0"-"C9" | "inherit"`, check: any, constants: ["inherit"], color: true })
             case "color_or_linecolor":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L289-L289
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L289
                 return makeType({ label: `color | "linecolor" | "markerfacecolor" | "markeredgecolor"`, check: any, constants: ["linecolor", "markerfacecolor", "markeredgecolor"], color: true })
             case "cycler":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L704-L704
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L703
                 return makeType({ label: `cycler`, check: any })
             case "whiskers":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L411-L411
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L410
                 return makeType({ shortLabel: type, label: `list[float] (len=2) | float`, check: (x) => x.split(',').length === 2 && x.split(',').map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number") || typeof json5Parse(x) === "number" })
             case "fillstyle": {
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L475-L475
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L475
                 return { ...makeEnum(["full", "left", "right", "bottom", "top", "none"]), shortLabel: type }
             } case "sketch":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L534-L534
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L533
                 return makeType({ shortLabel: type, label: `list[float] (len=3) | "${keywords.none}"`, check: (x) => x.toLowerCase() === "none" || x.split(",").length === 3 && x.split(",").map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number"), constants: [keywords.none] })
             case "hist_bins": {
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L766-L766
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L765
                 const values = ["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"]
                 return makeType({ shortLabel: type, label: "int | list[float] | " + values.map((v) => JSON.stringify(v)).join(" | "), check: (x) => values.includes(x) || x === "" || x.split(",").map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number") || typeof json5Parse(x) === "number" })
+            } case "fontstretch": {
+                // https://github.com/matplotlib/matplotlib/blob/6c3412baf6498d070d76ec60ed399329e6de1b6c/lib/matplotlib/rcsetup.py#L390
+                const values = ['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'normal', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded']
+                return orEnum(parseValidator(`validate_int`), values, true)
             } default:
                 // unimplemented
                 return makeType({ label: `${type} (any)`, check: any })
