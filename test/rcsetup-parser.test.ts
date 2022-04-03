@@ -189,7 +189,7 @@ describe("parseMplSource", () => {
         expect(data.documentation.get("backend")?.exampleValue).toContain("Agg")
         expect(data.documentation.get("figure.subplot.right")?.comment).toContain('the right side of the subplots of the figure')
         expect(data.params.has('font.family')).toEqual(true)
-        expect(data.params.get('legend.fontsize')?.label).toEqual(`"xx-small" | "x-small" | "small" | "medium" | "large" | "x-large" | "xx-large" | "smaller" | "larger" | float`)
+        expect(data.params.get('legend.fontsize')?.label).toEqual(`float | "xx-small" | "x-small" | "small" | "medium" | "large" | "x-large" | "xx-large" | "smaller" | "larger"`)
     })
 
     test("custom path", async () => {

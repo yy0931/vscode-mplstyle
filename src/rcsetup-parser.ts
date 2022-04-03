@@ -168,150 +168,160 @@ export type Type = {
     readonly color: boolean
 }
 
-/**
- * Parses a validator name used in _validators in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
- */
-const parseValidator = (source: string, keywords: { none: string; bool: string[] } = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }): Type => {
-    const makeType: (x: { readonly label: string; check: Type["check"] } & Partial<Type>) => Type = (x): Type => ({ constants: [], color: false, shortLabel: x.label, ...x })
-
-    /** case insensitive. All values must be lowercase. */
-    const makeEnum = (values: string[], caseSensitive: boolean = false) => {
+const Type = {
+    new: (x: { readonly label: string; check: Type["check"] } & Partial<Type>): Type => ({
+        constants: [],
+        color: false,
+        shortLabel: x.label,
+        ...x
+    }),
+    /** values[0] | values[1] | ... */
+    enum: (values: string[], caseSensitive: boolean = false) => {
         const valuesForCheck = caseSensitive ? values : values.map((v) => v.toLowerCase())
-        return makeType({ label: values.map((x) => JSON.stringify(x)).join(" | "), check: (x) => valuesForCheck.includes(caseSensitive ? x : x.toLowerCase()), constants: values })
-    }
-
-    const makeList = (child: Type, len: number | null, allow_stringlist: boolean) => {
+        return Type.new({ label: values.map((x) => JSON.stringify(x)).join(" | "), check: (x) => valuesForCheck.includes(caseSensitive ? x : x.toLowerCase()), constants: values })
+    },
+    /** child[] */
+    list: (child: Type, len: number | null = null, allow_stringlist: boolean = false) => {
         const left = (allow_stringlist ? "str | " : "") + "list["
         const right = "]" + (len === null ? '' : ` (len=${len})`)
-        return makeType({
+        return Type.new({
             shortLabel: left + child.shortLabel + right,
             label: left + child.label + right,
             check: (x) => allow_stringlist || (len === null || x.split(",").length === len) && (x.trim() === '' || x.split(",").map((v) => v.trim()).every((v) => child.check(v))),
             constants: child.constants,
             color: child.color,
         })
-    }
+    },
+    /** types[0] | types[1] | ... */
+    union: (...types: Type[]) => Type.new({
+        shortLabel: types.map((v) => v.shortLabel).join(" | "),
+        label: types.map((v) => v.label).join(" | "),
+        check: (x) => types.some((v) => v.check(x)),
+        constants: types.flatMap((v) => v.constants),
+        color: types.some((v) => v.color),
+    }),
+    int: () => Type.new({
+        label: "int",
+        check: (x) => {
+            x = json5Parse(x)
+            return typeof x === "number" && Number.isInteger(x)
+        },
+    }),
+    float: () => Type.new({
+        label: "float",
+        check: (x) => typeof json5Parse(x) === "number",
+    }),
+} as const
 
-    const orEnum = (base: Type, values: string[], caseSensitive: boolean = false) => {
-        const valuesForCheck = caseSensitive ? values : values.map((v) => v.toLowerCase())
-        return makeType({
-            shortLabel: `${values.map((v) => JSON.stringify(v)).join(" | ")} | ${base.shortLabel}`,
-            label: `${values.map((v) => JSON.stringify(v)).join(" | ")} | ${base.label}`,
-            check: (x) => base.check(x) || valuesForCheck.includes(caseSensitive ? x : x.toLowerCase()),
-            constants: [...base.constants, ...values],
-            color: base.color,
-        })
-    }
-
+/**
+ * Parses a validator name used in _validators in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
+ */
+const parseValidator = (source: string, keywords: { none: string; bool: string[] } = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }): Type => {
     const any = (x: string) => true
-
 
     let matches: RegExpExecArray | null = null
     if (matches = matchExpr(r`_?validate_(\w+)`, source)) {  // validate_bool, validate_float, _validate_linestyle, _validate_pathlike, etc.
         const type = matches[1]
         if (type.endsWith("_or_None")) {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L181
-            return orEnum(parseValidator(source.slice(0, -"_or_None".length)), [keywords.none])
+            return Type.union(parseValidator(source.slice(0, -"_or_None".length)), Type.enum([keywords.none]))
         }
         if (type === "fontsize_None") {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L354
-            return orEnum(parseValidator(source.slice(0, -"_None".length)), [keywords.none])
+            return Type.union(parseValidator(source.slice(0, -"_None".length)), Type.enum([keywords.none]))
         }
         if (type.endsWith("list")) {
             // comma-separated list, e.g. `key: val1, val2`
-            return makeList(parseValidator(source.slice(0, -"list".length)), null, false)
+            return Type.list(parseValidator(source.slice(0, -"list".length)))
         }
 
         // types
         switch (type) {
             case "linestyle":
-                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L434-L434
-                const values = ["-", "--", "-.", ":", " ", "solid", "dashed", "dashdot", "dotted", "none"]
-                return makeType({ shortLabel: type, label: '(offset (int), list["on" | "off"]) | list["on" | "off"] | ' + values.map((v) => JSON.stringify(v)).join(" | "), constants: values, check: (x) => true })
+                // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L434
+                return Type.union(Type.new({ shortLabel: type, label: '(offset (int), list["on" | "off"]) | list["on" | "off"]', check: any }), Type.enum(["-", "--", "-.", ":", " ", "solid", "dashed", "dashdot", "dotted", "none"]))
             case "dpi":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L163
-                return makeType({ label: `int | "figure"`, check: (x) => x === "figure" || typeof json5Parse(x) === "number", constants: ["figure"] })
+                return Type.union(Type.int(), Type.enum(["figure"], true))
             case "fontsize":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L360
-                return orEnum(parseValidator("validate_float"), ['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'smaller', 'larger'], true)
+                return Type.union(Type.float(), Type.enum(['xx-small', 'x-small', 'small', 'medium', 'large', 'x-large', 'xx-large', 'smaller', 'larger'], true))
             case "fontweight":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L377
-                return orEnum(parseValidator("validate_float"), ['ultralight', 'light', 'normal', 'regular', 'book', 'medium', 'roman', 'semibold', 'demibold', 'demi', 'bold', 'heavy', 'extra bold', 'black'], true)
+                return Type.union(Type.float(), Type.enum(['ultralight', 'light', 'normal', 'regular', 'book', 'medium', 'roman', 'semibold', 'demibold', 'demi', 'bold', 'heavy', 'extra bold', 'black'], true))
             case "bbox":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L519
-                return makeEnum(["tight", "standard"], true)
+                return Type.enum(["tight", "standard"], true)
             case "float":
-                return makeType({ label: "float", check: (x) => typeof json5Parse(x) === "number" })
+                return Type.float()
             case "int": {
-                return makeType({ label: "int", check: (x) => { x = json5Parse(x); return typeof x === "number" && Number.isInteger(x) } })
+                return Type.int()
             } case "bool":
                 // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L138
-                return makeType({ label: "bool", check: (x) => keywords.bool.map((v) => v.toLowerCase()).includes(x.toLowerCase()), constants: keywords.bool })
+                return Type.new({ label: "bool", check: (x) => keywords.bool.map((v) => v.toLowerCase()).includes(x.toLowerCase()), constants: keywords.bool })
             case "string":
-                return makeType({ label: `str`, check: any })
+                return Type.new({ label: `str`, check: any })
             case "any":
-                return makeType({ label: `any`, check: any })
+                return Type.new({ label: `any`, check: any })
             case "dash":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L581
-                return parseValidator(`validate_floatlist`)
+                return Type.list(Type.float())
             case "hatch": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L565
-                return makeType({ label: String.raw`/[\\/|\-+*.xoO]*/`, check: (x) => x === "" || /[\\/|\-+*.xoO]*/.test(x) })
+                return Type.new({ label: String.raw`/[\\/|\-+*.xoO]*/`, check: (x) => x === "" || /[\\/|\-+*.xoO]*/.test(x) })
             } case "cmap":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L339
-                return makeType({ label: type, check: any })
+                return Type.new({ label: type, check: any })
             case "fonttype":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L224
-                return makeType({ label: type, check: any })
+                return Type.new({ label: type, check: any })
             case "pathlike":
-                return makeType({ label: type, check: any })
+                return Type.new({ label: type, check: any })
             case "aspect":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L344
-                return orEnum(parseValidator("validate_float"), ["auto", "equal"], true)
+                return Type.union(Type.float(), Type.enum(["auto", "equal"], true))
             case "axisbelow":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L152
-                return orEnum(parseValidator("validate_bool"), ["line"], true)
+                return Type.union(parseValidator("validate_bool"), Type.enum(["line"], true))
             case "color":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L310
-                return makeType({ label: `color | "C0"-"C9"`, check: any, color: true })
+                return Type.new({ label: `color | "C0"-"C9"`, check: any, color: true })
             case "color_or_auto":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L276
-                return makeType({ label: `color | "C0"-"C9" | "auto"`, check: any, constants: ["auto"], color: true })
+                return Type.new({ label: `color | "C0"-"C9" | "auto"`, check: any, constants: ["auto"], color: true })
             case "color_for_prop_cycle":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L282
-                return makeType({ label: 'color', check: any, color: true })
+                return Type.new({ label: 'color', check: any, color: true })
             case "color_or_inherit":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L269
-                return makeType({ label: `color | "C0"-"C9" | "inherit"`, check: any, constants: ["inherit"], color: true })
+                return Type.new({ label: `color | "C0"-"C9" | "inherit"`, check: any, constants: [...Array.from(Array(10).keys(), (i) => `C${i}`), "inherit"], color: true })
             case "color_or_linecolor":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L289
-                return makeType({ label: `color | "linecolor" | "markerfacecolor" | "markeredgecolor"`, check: any, constants: ["linecolor", "markerfacecolor", "markeredgecolor"], color: true })
+                return Type.union(Type.new({ label: "color", check: any, color: true }), Type.enum(["linecolor", "markerfacecolor", "markeredgecolor"]))
             case "cycler":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L703
-                return makeType({ label: `cycler`, check: any })
+                return Type.new({ label: `cycler`, check: any })
             case "whiskers":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L410
-                return makeType({ shortLabel: type, label: `list[float] (len=2) | float`, check: (x) => x.split(',').length === 2 && x.split(',').map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number") || typeof json5Parse(x) === "number" })
+                return Type.union(Type.list(Type.float(), 2), Type.float())
             case "fillstyle": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L475
-                return { ...makeEnum(["full", "left", "right", "bottom", "top", "none"]), shortLabel: type }
+                return { ...Type.enum(["full", "left", "right", "bottom", "top", "none"]), shortLabel: type }
             } case "sketch":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L533
-                return makeType({ shortLabel: type, label: `list[float] (len=3) | "${keywords.none}"`, check: (x) => x.toLowerCase() === "none" || x.split(",").length === 3 && x.split(",").map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number"), constants: [keywords.none] })
+                return Type.union(Type.list(Type.float(), 3), Type.enum([keywords.none]))
             case "hist_bins": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L765
-                const values = ["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"]
-                return makeType({ shortLabel: type, label: "int | list[float] | " + values.map((v) => JSON.stringify(v)).join(" | "), check: (x) => values.includes(x) || x === "" || x.split(",").map((v) => v.trim()).every((v) => typeof json5Parse(v) === "number") || typeof json5Parse(x) === "number" })
+                return Type.union(Type.int(), parseValidator("validate_floatlist"), Type.enum(["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"], true))
             } case "fontstretch": {
                 // https://github.com/matplotlib/matplotlib/blob/6c3412baf6498d070d76ec60ed399329e6de1b6c/lib/matplotlib/rcsetup.py#L390
-                const values = ['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'normal', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded']
-                return orEnum(parseValidator(`validate_int`), values, true)
+                return Type.union(Type.int(), Type.enum(['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'normal', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'], true))
             } default:
                 // unimplemented
-                return makeType({ label: `${type} (any)`, check: any })
+                return Type.new({ label: `${type} (any)`, check: any })
         }
     } else if (matchExpr(r`_range_validators\["0 <= x <= 1"\]`, source)) { // _range_validators["0 <= x <= 1"]
-        return makeType({
+        return Type.new({
             label: "float (0 <= x <= 1)",
             check: (x) => {
                 x = json5Parse(x)
@@ -319,7 +329,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
             },
         })
     } else if (matchExpr(r`_range_validators\["0 <= x < 1"\]`, source)) {  // _range_validators["0 <= x < 1"]
-        return makeType({
+        return Type.new({
             label: "float (0 <= x < 1)",
             check: (x) => {
                 x = json5Parse(x)
@@ -328,29 +338,29 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
         })
     } else if (matchExpr(r`JoinStyle`, source)) { // JoinStyle
         // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L82-L82
-        return makeEnum(["miter", "round", "bevel"])
+        return Type.enum(["miter", "round", "bevel"])
     } else if (matchExpr(r`CapStyle`, source)) {
         // https://github.com/matplotlib/matplotlib/blob/b09aad279b5colordcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L151-L151
-        return makeEnum(["butt", "projecting", "round"])
+        return Type.enum(["butt", "projecting", "round"])
     } else if (matches = matchExpr(r`(\[\s*(?:"[^"]*"|'[^']*')\s*(?:,\s*(?:"[^"]*"|'[^']*')\s*)*\])\s*`, source)) { // ["foo", "bar"]
         try {
             const values = json5.parse(matches[1])
             if (Array.isArray(values) && values.every((v) => typeof v === "string")) {
-                return makeEnum(values)
+                return Type.enum(values)
             } else {
-                return makeType({ label: `${source} (any)`, check: any })
+                return Type.new({ label: `${source} (any)`, check: any })
             }
         } catch (err) {
             console.log(`Parse error: ${matches[1]}`)
-            return makeType({ label: `${source} (any)`, check: any })
+            return Type.new({ label: `${source} (any)`, check: any })
         }
     } else if (matches = matchExpr(r`_listify_validator\(([^\)]+?)(?:,\s*n=(\d+)\s*)?(?:,\s*allow_stringlist=(True|False)\s*)?\)`, source)) { // _listify_validator(validate_int, n=2)
         const len = (matches[2])
-        return makeList(parseValidator(matches[1]), len === undefined ? null : +len, matches[3] === "True")
+        return Type.list(parseValidator(matches[1]), len === undefined ? null : +len, matches[3] === "True")
     } else if (matches = matchExpr(r`_ignorecase\(([^\)]+)\)`, source)) {
         return parseValidator(matches[1])
     } else {
-        return makeType({ label: `${source} (any)`, check: any })
+        return Type.new({ label: `${source} (any)`, check: any })
     }
 }
 
