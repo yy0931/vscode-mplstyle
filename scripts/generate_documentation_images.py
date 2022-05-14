@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import re
 import shutil
 from pathlib import Path
 from typing import Callable
@@ -106,12 +107,12 @@ lines.color: red
 pcolor.shading: flat
 pcolormesh.snap: False
 xtick.major.top: False
-xtick.minor.pad: 6.8;      xtick.minor.visible: True; ytick.minor.visible: True
-xtick.minor.size: 4;       xtick.minor.visible: True; ytick.minor.visible: True
-xtick.minor.top: False;    xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.pad: 6.8     WITH xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.size: 4      WITH xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.top: False   WITH xtick.minor.visible: True; ytick.minor.visible: True
 ytick.major.right: False
-ytick.minor.pad: 6.8;      xtick.minor.visible: True; ytick.minor.visible: True
-ytick.minor.right: False;  xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.pad: 6.8     WITH xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.right: False WITH xtick.minor.visible: True; ytick.minor.visible: True
 """
 
 
@@ -121,19 +122,19 @@ def parse_config(config: str):
             continue
 
         values: list[tuple[str, str]] = []
-        for pair in line.split(";"):
+        for pair in re.split(r"WITH|;", line):
             k, v = pair.split(":", 1)
             values.append((k.strip(), v.strip()))
         yield values
 
 
 for values in parse_config("""
-axes.edgecolor: green; axes.linewidth: 1.5
+axes.edgecolor: green      WITH axes.linewidth: 1.5
 axes.facecolor: lightgreen
 axes.grid: True
-axes.grid.which: both; axes.grid: True; xtick.minor.visible: True
+axes.grid.which: both      WITH axes.grid: True; xtick.minor.visible: True
 axes.labelcolor: green
-axes.labelpad: 10.0; axes.labelpad: 0
+axes.labelpad: 10.0        WITH axes.labelpad: 0
 axes.labelsize: xx-small
 axes.labelweight: bold
 axes.linewidth: 5
@@ -147,26 +148,26 @@ axes.titlelocation: left
 axes.titlepad: 20.0
 axes.titlesize: xx-small
 axes.titleweight: bold
-axes.titley: 0.2; axes.titley: 1
-axes.grid.axis: x; axes.grid: True
+axes.titley: 0.2   WITH axes.titley: 1
+axes.grid.axis: x  WITH axes.grid: True
 axes.xmargin: 0.5
 axes.ymargin: 0.5
 lines.antialiased: False
-lines.dashdot_pattern: 8, 1, 1, 8; lines.linestyle: dashdot
-lines.dashed_pattern: 8, 1; lines.linestyle: dashed
-lines.dotted_pattern: 1, 4; lines.linestyle: dotted
+lines.dashdot_pattern: 8, 1, 1, 8 WITH lines.linestyle: dashdot
+lines.dashed_pattern: 8, 1        WITH lines.linestyle: dashed
+lines.dotted_pattern: 1, 4        WITH lines.linestyle: dotted
 lines.linestyle: --
 lines.linewidth: 4.5
 lines.marker: o
-lines.markeredgecolor: lightgreen; lines.marker: o
-lines.markeredgewidth: 2.0; lines.marker: o; lines.markeredgecolor: lightgreen
-lines.markerfacecolor: lightgreen; lines.marker: o
-lines.markersize: 12; lines.marker: o
-lines.scale_dashes: False; lines.linestyle: dashed
-markers.fillstyle: bottom; lines.marker: o; lines.markeredgecolor: lightgreen
-grid.linewidth: 4; axes.grid: True
+lines.markeredgecolor: lightgreen WITH lines.marker: o
+lines.markeredgewidth: 2.0        WITH lines.marker: o; lines.markeredgecolor: lightgreen
+lines.markerfacecolor: lightgreen WITH lines.marker: o
+lines.markersize: 12              WITH lines.marker: o
+lines.scale_dashes: False         WITH lines.linestyle: dashed
+markers.fillstyle: bottom         WITH lines.marker: o; lines.markeredgecolor: lightgreen
+grid.linewidth: 4                 WITH axes.grid: True
 font.size: 15
-axes.axisbelow: False; axes.axisbelow: True; lines.linewidth: 5; grid.color: black; axes.grid: True
+axes.axisbelow: False             WITH axes.axisbelow: True; lines.linewidth: 5; grid.color: black; axes.grid: True
 xtick.top: True
 ytick.left: False
 xtick.bottom: False
@@ -195,19 +196,19 @@ ytick.alignment: top
 xtick.major.pad: 15
 ytick.major.pad: 15
 ytick.major.left: False
-xtick.minor.bottom: False; xtick.minor.visible: True; ytick.minor.visible: True
-ytick.minor.size: 4;       xtick.minor.visible: True; ytick.minor.visible: True
-xtick.minor.width: 5;      xtick.minor.visible: True; ytick.minor.visible: True
-ytick.minor.width: 5;      xtick.minor.visible: True; ytick.minor.visible: True
-ytick.minor.left: False;   xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.bottom: False  WITH xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.size: 4        WITH xtick.minor.visible: True; ytick.minor.visible: True
+xtick.minor.width: 5       WITH xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.width: 5       WITH xtick.minor.visible: True; ytick.minor.visible: True
+ytick.minor.left: False    WITH xtick.minor.visible: True; ytick.minor.visible: True
 """):
     render_figure(plot_axes_simple, *values[0], values[1:])
 
 for values in parse_config("""
-lines.solid_capstyle: round; lines.linewidth: 15; axes.xmargin: 0.5; axes.ymargin: 0.3
-lines.solid_joinstyle: miter; lines.linewidth: 15; axes.xmargin: 0.5; axes.ymargin: 0.3
-lines.dash_capstyle: round; lines.linestyle: dashed; lines.linewidth: 5; lines.linewidth: 10
-lines.dash_joinstyle: miter; lines.linestyle: dashed; lines.linewidth: 5; lines.linewidth: 10; axes.xmargin: 0.2; axes.ymargin: 0.3
+lines.solid_capstyle: round   WITH lines.linewidth: 15; axes.xmargin: 0.5; axes.ymargin: 0.3
+lines.solid_joinstyle: miter  WITH lines.linewidth: 15; axes.xmargin: 0.5; axes.ymargin: 0.3
+lines.dash_capstyle: round    WITH lines.linestyle: dashed; lines.linewidth: 5; lines.linewidth: 10
+lines.dash_joinstyle: miter   WITH lines.linestyle: dashed; lines.linewidth: 5; lines.linewidth: 10; axes.xmargin: 0.2; axes.ymargin: 0.3
 """):
     render_figure(plot_capstyle_simple, *values[0], values[1:])
 
@@ -218,7 +219,7 @@ legend.scatterpoints: 2
 for values in parse_config("""
 legend.loc: center
 legend.frameon: False
-legend.framealpha: 0.2; axes.facecolor: lightgreen; legend.edgecolor: black
+legend.framealpha: 0.2  WITH axes.facecolor: lightgreen; legend.edgecolor: black
 legend.facecolor: lightgreen
 legend.edgecolor: green
 legend.shadow: True
@@ -232,7 +233,7 @@ legend.handletextpad: 4
 legend.borderaxespad: 2.5
 legend.numpoints: 2
 legend.markerscale: 2.0
-legend.fancybox: False; legend.edgecolor: green
+legend.fancybox: False  WITH legend.edgecolor: green
 """):
     render_figure(plot_axes_legend, *values[0], values[1:])
 
