@@ -177,6 +177,12 @@ describe('parseValidator', () => {
             [[`_listify_validator(validate_int, allow_stringlist=True)`], `str | list[int]`],
         )
     })
+    describe("keywords", () => {
+        testInputOutput((type: string) => p._testing.parseValidator(type, { bool: ["t", "f"], none: "none" }).constants)(
+            [[`validate_boollist`], ["t", "f"]],
+            [["validate_bool_or_None"], ["t", "f", "none"]],
+        )
+    })
 })
 
 const readFile = async (filepath: string) => fs.promises.readFile(filepath).then((v) => v.toString())

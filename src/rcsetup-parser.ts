@@ -224,15 +224,15 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
         const type = matches[1]
         if (type.endsWith("_or_None")) {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L181
-            return Type.union(parseValidator(source.slice(0, -"_or_None".length)), Type.enum([keywords.none]))
+            return Type.union(parseValidator(source.slice(0, -"_or_None".length), keywords), Type.enum([keywords.none]))
         }
         if (type === "fontsize_None") {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L354
-            return Type.union(parseValidator(source.slice(0, -"_None".length)), Type.enum([keywords.none]))
+            return Type.union(parseValidator(source.slice(0, -"_None".length), keywords), Type.enum([keywords.none]))
         }
         if (type.endsWith("list")) {
             // comma-separated list, e.g. `key: val1, val2`
-            return Type.list(parseValidator(source.slice(0, -"list".length)))
+            return Type.list(parseValidator(source.slice(0, -"list".length), keywords))
         }
 
         // types
@@ -282,7 +282,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
                 return Type.union(Type.float(), Type.enum(["auto", "equal"], true))
             case "axisbelow":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L152
-                return Type.union(parseValidator("validate_bool"), Type.enum(["line"], true))
+                return Type.union(parseValidator("validate_bool", keywords), Type.enum(["line"], true))
             case "color":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L310
                 return Type.new({ label: `color | "C0"-"C9"`, check: any, color: true })
@@ -312,7 +312,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
                 return Type.union(Type.list(Type.float(), 3), Type.enum([keywords.none]))
             case "hist_bins": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L765
-                return Type.union(Type.int(), parseValidator("validate_floatlist"), Type.enum(["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"], true))
+                return Type.union(Type.int(), parseValidator("validate_floatlist", keywords), Type.enum(["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"], true))
             } case "fontstretch": {
                 // https://github.com/matplotlib/matplotlib/blob/6c3412baf6498d070d76ec60ed399329e6de1b6c/lib/matplotlib/rcsetup.py#L390
                 return Type.union(Type.int(), Type.enum(['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'normal', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'], true))
@@ -356,9 +356,9 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
         }
     } else if (matches = matchExpr(r`_listify_validator\(([^\)]+?)(?:,\s*n=(\d+)\s*)?(?:,\s*allow_stringlist=(True|False)\s*)?\)`, source)) { // _listify_validator(validate_int, n=2)
         const len = (matches[2])
-        return Type.list(parseValidator(matches[1]), len === undefined ? null : +len, matches[3] === "True")
+        return Type.list(parseValidator(matches[1], keywords), len === undefined ? null : +len, matches[3] === "True")
     } else if (matches = matchExpr(r`_ignorecase\(([^\)]+)\)`, source)) {
-        return parseValidator(matches[1])
+        return parseValidator(matches[1], keywords)
     } else {
         return Type.new({ label: `${source} (any)`, check: any })
     }
