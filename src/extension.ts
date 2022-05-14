@@ -1,7 +1,7 @@
 import vscode from "vscode"
 import Logger from "./logger"
 import * as mplstyleParser from "./mplstyle-parser"
-import { parseMplSource } from "./rcsetup-parser"
+import { CompletionOptions, parseMplSource } from "./rcsetup-parser"
 
 const formatLine = (line: string) => {
     const pair = mplstyleParser.parseLine(line)
@@ -115,10 +115,10 @@ const getMatplotlibPathConfig = () => {
     return vscode.Uri.file(value)
 }
 
-const getKeywords = (): { none: string; bool: string[] } => {
+const getKeywords = (cm: CompletionOptions["cm"]): CompletionOptions => {
     const none = vscode.workspace.getConfiguration("mplstyle").get<string>("completion.keywords.none")!
     const bool = vscode.workspace.getConfiguration("mplstyle").get<string[]>("completion.keywords.bool")!
-    return { none, bool }
+    return { none, bool, cm }
 }
 
 export const activate = async (context: vscode.ExtensionContext) => {
@@ -136,14 +136,15 @@ export const activate = async (context: vscode.ExtensionContext) => {
         })))
     }
 
-    let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
+    const cm = JSON.parse(await readFile(vscode.Uri.joinPath(context.extensionUri, "matplotlib", "cm.json"))) as string[]
+    let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords(cm))
     for (const err of mpl.errors) {
         logger.error(err)
     }
 
     const diagnosticCollection = vscode.languages.createDiagnosticCollection("mplstyle")
-    const colorMap = new Map(Object.entries(JSON.parse(await readFile(vscode.Uri.joinPath(context.extensionUri, "matplotlib", "color_map.json"))) as Record<string, readonly [number, number, number, number]>))
-    logger.info(`The number of color names: ${colorMap.size}`)
+    const colors = new Map(Object.entries(JSON.parse(await readFile(vscode.Uri.joinPath(context.extensionUri, "matplotlib", "colors.json"))) as Record<string, readonly [number, number, number, number]>))
+    logger.info(`The number of color names: ${colors.size}`)
 
     const imageDir = vscode.Uri.joinPath(context.extensionUri, "example")
     // NOTE: vscode.workspace.fs.readDirectory() does not work on browsers
@@ -191,7 +192,7 @@ export const activate = async (context: vscode.ExtensionContext) => {
 
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(async (ev) => logger.try(async () => {
         if (ev.affectsConfiguration("mplstyle.hover.matplotlibPath") || ev.affectsConfiguration("mplstyle.completion.keywords")) {
-            mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords())
+            mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords(cm))
             for (const err of mpl.errors) {
                 logger.error(err)
             }
@@ -276,14 +277,14 @@ export const activate = async (context: vscode.ExtensionContext) => {
                         item.detail = "constant"
                         return item
                     })
-                    const colors = (quotation: string, range?: vscode.Range) => Array.from(colorMap.entries()).map(([k, v]) => {
+                    const colorNameCompletionItems = (quotation: string, range?: vscode.Range) => Array.from(colors.entries()).map(([k, v]) => {
                         const item = new vscode.CompletionItem(quotation + k + quotation, vscode.CompletionItemKind.Color)
                         item.detail = "#" + toHex(v)
                         if (range !== undefined) { item.range = range }
                         return item
                     })
                     if (type.color) {
-                        items.push(...colors(''))
+                        items.push(...colorNameCompletionItems(''))
                     } else if (type.label === "cycler") {
                         if (textLine.text.slice(line.value.start, position.character).trim() === "") {
                             // Function name
@@ -295,9 +296,9 @@ export const activate = async (context: vscode.ExtensionContext) => {
                         } else {
                             const m = /['"][\w :]*$/.exec(textLine.text.slice(0, position.character))
                             if (m === null) {
-                                items.push(...colors("'"))
+                                items.push(...colorNameCompletionItems("'"))
                             } else {
-                                items.push(...colors('', new vscode.Range(position.line, m.index + 1, position.line, position.character)))
+                                items.push(...colorNameCompletionItems('', new vscode.Range(position.line, m.index + 1, position.line, position.character)))
                             }
                         }
                     }
@@ -377,7 +378,7 @@ export const activate = async (context: vscode.ExtensionContext) => {
             return logger.trySync(() => {
                 const result: vscode.ColorInformation[] = []
                 for (const { pair, line } of Array.from(mplstyleParser.parseAll(document.getText()).rc.values()).flat()) {
-                    for (const [start, end, color] of findDocumentColorRanges(mpl, colorMap, pair)) {
+                    for (const [start, end, color] of findDocumentColorRanges(mpl, colors, pair)) {
                         result.push(new vscode.ColorInformation(new vscode.Range(line, start, line, end), new vscode.Color(...color)))
                     }
                 }

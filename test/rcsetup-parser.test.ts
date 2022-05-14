@@ -178,7 +178,7 @@ describe('parseValidator', () => {
         )
     })
     describe("keywords", () => {
-        testInputOutput((type: string) => p._testing.parseValidator(type, { bool: ["t", "f"], none: "none" }).constants)(
+        testInputOutput((type: string) => p._testing.parseValidator(type, { bool: ["t", "f"], none: "none", cm: [] }).constants)(
             [[`validate_boollist`], ["t", "f"]],
             [["validate_bool_or_None"], ["t", "f", "none"]],
         )

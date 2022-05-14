@@ -107,7 +107,7 @@ describe("findRcParamsInPythonFiles", () => {
 })
 
 describe("parseColor", () => {
-    const colorMap = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, "../matplotlib", "color_map.json")).toString()) as Record<string, readonly [number, number, number, number]>))
+    const colorMap = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, "../matplotlib", "colors.json")).toString()) as Record<string, readonly [number, number, number, number]>))
     testInputOutput((input: string) => p.parseColor(input, colorMap))(
         [["red"], [1, 0, 0, 1]],
         [["00ff00"], [0, 1, 0, 1]],

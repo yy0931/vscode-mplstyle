@@ -1,10 +1,12 @@
 import json5 from "json5"
 import parseMatplotlibrc from "./sample-matplotlibrc-parser"
 
+export type CompletionOptions = { none: string, bool: string[], cm: string[] }
+
 /**
  * Parses [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1), which defines the list of runtime configuration parameters and their possible values.
  */
-export const parseMplSource = async <Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, keywords?: { none: string, bool: string[] }): Promise<{ params: Map<string, Type>; cyclerProps: Map<string, Type>; documentation: Map<string, { exampleValue: string; comment: string }>; errors: string[] }> => {
+export const parseMplSource = async <Path extends { toString(): string }>(extensionPath: Path, matplotlibPath: Path | undefined, joinPaths: (a: Path, b: string) => Path, readFile: (path: Path) => Promise<string>, isNOENT: (err: unknown) => boolean, opts?: CompletionOptions): Promise<{ params: Map<string, Type>; cyclerProps: Map<string, Type>; documentation: Map<string, { exampleValue: string; comment: string }>; errors: string[] }> => {
     // Read and parse matplotlib/rcsetup.py
     const useDefaultPath = !matplotlibPath
     const matplotlibDirectory = useDefaultPath ? joinPaths(extensionPath, "matplotlib") : matplotlibPath
@@ -48,8 +50,8 @@ export const parseMplSource = async <Path extends { toString(): string }>(extens
         }
     }
 
-    const params = new Map(validators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
-    const cyclerProps = new Map(propValidators.result.map(({ key, value }) => [key, parseValidator(value, keywords)]))
+    const params = new Map(validators.result.map(({ key, value }) => [key, parseValidator(value, opts)]))
+    const cyclerProps = new Map(propValidators.result.map(({ key, value }) => [key, parseValidator(value, opts)]))
 
     const matplotlibrc = await readMatplotlibFile(withPrefix("mpl-data/matplotlibrc"))
     if ("err" in matplotlibrc) {
@@ -216,7 +218,7 @@ const Type = {
 /**
  * Parses a validator name used in _validators in [matplotlib/lib/matplotlib/rcsetup.py](https://github.com/matplotlib/matplotlib/blob/b9ae51ca8c5915fe7accf712a504e08e35b2f69d/lib/matplotlib/rcsetup.py#L1).
  */
-const parseValidator = (source: string, keywords: { none: string; bool: string[] } = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"] }): Type => {
+const parseValidator = (source: string, opts: CompletionOptions = { none: "None", bool: ["t", "y", "yes", "on", "True", "1", "f", "n", "no", "off", "False", "0"], cm: [] }): Type => {
     const any = (x: string) => true
 
     let matches: RegExpExecArray | null = null
@@ -224,15 +226,15 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
         const type = matches[1]
         if (type.endsWith("_or_None")) {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L181
-            return Type.union(parseValidator(source.slice(0, -"_or_None".length), keywords), Type.enum([keywords.none]))
+            return Type.union(parseValidator(source.slice(0, -"_or_None".length), opts), Type.enum([opts.none]))
         }
         if (type === "fontsize_None") {
             // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L354
-            return Type.union(parseValidator(source.slice(0, -"_None".length), keywords), Type.enum([keywords.none]))
+            return Type.union(parseValidator(source.slice(0, -"_None".length), opts), Type.enum([opts.none]))
         }
         if (type.endsWith("list")) {
             // comma-separated list, e.g. `key: val1, val2`
-            return Type.list(parseValidator(source.slice(0, -"list".length), keywords))
+            return Type.list(parseValidator(source.slice(0, -"list".length), opts))
         }
 
         // types
@@ -258,7 +260,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
                 return Type.int()
             } case "bool":
                 // https://github.com/matplotlib/matplotlib/blob/3a265b33fdba148bb340e743667c4ba816ced928/lib/matplotlib/rcsetup.py#L138
-                return Type.new({ label: "bool", check: (x) => keywords.bool.map((v) => v.toLowerCase()).includes(x.toLowerCase()), constants: keywords.bool })
+                return Type.new({ label: "bool", check: (x) => opts.bool.map((v) => v.toLowerCase()).includes(x.toLowerCase()), constants: opts.bool })
             case "string":
                 return Type.new({ label: `str`, check: any })
             case "any":
@@ -271,7 +273,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
                 return Type.new({ label: String.raw`/[\\/|\-+*.xoO]*/`, check: (x) => x === "" || /[\\/|\-+*.xoO]*/.test(x) })
             } case "cmap":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L339
-                return Type.new({ label: type, check: any })
+                return Type.new({ label: type, check: any, constants: opts.cm })
             case "fonttype":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L224
                 return Type.new({ label: type, check: any })
@@ -282,7 +284,7 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
                 return Type.union(Type.float(), Type.enum(["auto", "equal"], true))
             case "axisbelow":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L152
-                return Type.union(parseValidator("validate_bool", keywords), Type.enum(["line"], true))
+                return Type.union(parseValidator("validate_bool", opts), Type.enum(["line"], true))
             case "color":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L310
                 return Type.new({ label: `color | "C0"-"C9"`, check: any, color: true })
@@ -309,10 +311,10 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
                 return { ...Type.enum(["full", "left", "right", "bottom", "top", "none"]), shortLabel: type }
             } case "sketch":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L533
-                return Type.union(Type.list(Type.float(), 3), Type.enum([keywords.none]))
+                return Type.union(Type.list(Type.float(), 3), Type.enum([opts.none]))
             case "hist_bins": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L765
-                return Type.union(Type.int(), parseValidator("validate_floatlist", keywords), Type.enum(["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"], true))
+                return Type.union(Type.int(), parseValidator("validate_floatlist", opts), Type.enum(["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"], true))
             } case "fontstretch": {
                 // https://github.com/matplotlib/matplotlib/blob/6c3412baf6498d070d76ec60ed399329e6de1b6c/lib/matplotlib/rcsetup.py#L390
                 return Type.union(Type.int(), Type.enum(['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'normal', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'], true))
@@ -356,9 +358,9 @@ const parseValidator = (source: string, keywords: { none: string; bool: string[]
         }
     } else if (matches = matchExpr(r`_listify_validator\(([^\)]+?)(?:,\s*n=(\d+)\s*)?(?:,\s*allow_stringlist=(True|False)\s*)?\)`, source)) { // _listify_validator(validate_int, n=2)
         const len = (matches[2])
-        return Type.list(parseValidator(matches[1], keywords), len === undefined ? null : +len, matches[3] === "True")
+        return Type.list(parseValidator(matches[1], opts), len === undefined ? null : +len, matches[3] === "True")
     } else if (matches = matchExpr(r`_ignorecase\(([^\)]+)\)`, source)) {
-        return parseValidator(matches[1], keywords)
+        return parseValidator(matches[1], opts)
     } else {
         return Type.new({ label: `${source} (any)`, check: any })
     }

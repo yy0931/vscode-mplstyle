@@ -123,7 +123,7 @@ axes.prop_cycle: cycler(color=['{red}', '{tab:red}', '{xkcd:red brown}'])
 axes.prop_cycle: cycler(color=["{0.4}", "{123456}", "{12345678}", "{#123456}", "{#12345678}"])
 axes.prop_cycle: cycler(color=['{0.4}', '{123456}', '{12345678}'])
 `
-    const colorMap = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, "../matplotlib", "color_map.json")).toString()) as Record<string, readonly [number, number, number, number]>))
+    const colorMap = new Map(Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, "../matplotlib", "colors.json")).toString()) as Record<string, readonly [number, number, number, number]>))
     const params = new Map<string, Type>([
         ["text.color", { color: true, check: (_) => true, constants: [], label: "color", shortLabel: "color" }],
         ["axes.prop_cycle", { color: false, check: (_) => true, constants: [], label: "cycler", shortLabel: "cycler" }],
