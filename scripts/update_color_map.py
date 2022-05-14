@@ -3,7 +3,12 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib.colors
-from matplotlib.cm import _cmap_registry  # type: ignore
+try:
+    # matplotlib <= v3.5.2
+    from matplotlib.cm import _cmap_registry  # type: ignore
+except ImportError:
+    # matplotlib > v3.5.2 https://github.com/matplotlib/matplotlib/commit/fb902f735995372f345a8333804f5c6052f29770
+    from matplotlib.cm import _colormaps as _cmap_registry  # type: ignore
 
 
 def json_dump_compact(obj: Any):
