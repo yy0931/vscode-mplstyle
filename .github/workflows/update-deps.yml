@@ -14,6 +14,7 @@ jobs:
           pip3 uninstall matplotlib -y
           git clone --depth=1 -b main https://github.com/matplotlib/matplotlib matplotlib-latest
           pip3 install ./matplotlib-latest
+          rm -rf matplotlib-latest
       - name: Update matplotlib/
         run: |
           ./scripts/update_matplotlib_source.sh
