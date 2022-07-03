@@ -607,10 +607,11 @@
 ## * CONTOUR PLOTS                                                           *
 ## ***************************************************************************
 #contour.negative_linestyle: dashed  # string or on-off ink sequence
-#contour.corner_mask:        True    # {True, False, legacy}
+#contour.corner_mask:        True    # {True, False}
 #contour.linewidth:          None    # {float, None} Size of the contour line
                                      # widths. If set to None, it falls back to
                                      # `line.linewidth`.
+#contour.algorithm:          mpl2014 # {mpl2005, mpl2014, serial, threaded}
 
 
 ## ***************************************************************************
@@ -767,12 +768,18 @@
 #animation.bitrate: -1            # Controls size/quality trade-off for movie.
                                   # -1 implies let utility auto-determine
 #animation.frame_format: png      # Controls frame format used by temp files
-#animation.ffmpeg_path:  ffmpeg   # Path to ffmpeg binary. Without full path
-                                  # $PATH is searched
-#animation.ffmpeg_args:           # Additional arguments to pass to ffmpeg
-#animation.convert_path: convert  # Path to ImageMagick's convert binary.
-                                  # On Windows use the full path since convert
-                                  # is also the name of a system tool.
-#animation.convert_args:          # Additional arguments to pass to convert
+
+## Path to ffmpeg binary.  Unqualified paths are resolved by subprocess.Popen.
+#animation.ffmpeg_path:  ffmpeg
+## Additional arguments to pass to ffmpeg.
+#animation.ffmpeg_args:
+
+## Path to ImageMagick's convert binary.  Unqualified paths are resolved by
+## subprocess.Popen, except that on Windows, we look up an install of
+## ImageMagick in the registry (as convert is also the name of a system tool).
+#animation.convert_path: convert
+## Additional arguments to pass to convert.
+#animation.convert_args: -layers, OptimizePlus
+#
 #animation.embed_limit:  20.0     # Limit, in MB, of size of base64 encoded
                                   # animation in HTML (i.e. IPython notebook)
