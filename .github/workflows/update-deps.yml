@@ -1,0 +1,26 @@
+name: Update matplotlib/
+on:
+  push:
+  schedule:
+    - cron: 1 2 3 * *  # run monthly
+jobs:
+  create_pull_request:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - run: pip3 install numpy
+      - name: Install Matplotlib from GitHub
+        run: |
+          pip3 uninstall matplotlib -y
+          git clone --depth=1 -b main https://github.com/matplotlib/matplotlib matplotlib-latest
+          pip3 install ./matplotlib-latest
+      - name: Update matplotlib/
+        run: |
+          ./scripts/update_matplotlib_source.sh
+          python3 ./scripts/update_color_map.py
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v4
+        with:
+          commit-message: Update matplotlib/
+          delete-branch: true
+          title: Update matplotlib/

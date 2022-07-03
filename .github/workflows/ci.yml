@@ -1,32 +1,23 @@
 name: CI
-on:
-  push:
-  schedule:
-    - cron: 1 2 3 * *  # run monthly
+on: push
 jobs:
   test_language_features:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install Matplotlib from pypi
-        run: pip3 install matplotlib numpy
+      - run: pip3 install matplotlib numpy
       - uses: actions/setup-node@v2
         with:
           node-version: 16.x
       - run: npm ci -D
       - run: npm test
+
       - name: Install Matplotlib from GitHub
         run: |
           pip3 uninstall matplotlib -y
           git clone --depth=1 -b main https://github.com/matplotlib/matplotlib matplotlib-latest
           pip3 install ./matplotlib-latest
       - run: npm test
-
-      - name: Check for updates of Matplotlib
-        run: |
-          ./scripts/update_matplotlib_source.sh
-          python3 ./scripts/update_color_map.py
-          git diff --name-only --exit-code matplotlib
 
       - name: Test `npm run build:browser`
         run: npm run build:browser
