@@ -179,6 +179,26 @@ export const activate = async (context: vscode.ExtensionContext) => {
         )
     }
 
+    context.subscriptions.push(vscode.workspace.onDidOpenTextDocument((document) => logger.trySync(() => {
+        if (document.languageId !== "mplstyle") { return }
+        // Display the message after 3 days of use and if the user has used the extension for more than 5 seconds.
+        const daysRequired = 3
+        const dates = [...new Set([...context.globalState.get<string[]>("dates", []), new Date().toISOString().split('T')[0]])].slice(0, daysRequired)
+        context.globalState.update("dates", dates)
+        setTimeout(() => {
+            if (vscode.window.activeTextEditor?.document.languageId !== "mplstyle") { return }
+            if (dates.length >= daysRequired && !context.globalState.get("hasShownStarMeDialog")) {
+                context.globalState.update("hasShownStarMeDialog", true)
+                vscode.window.showInformationMessage("[mplstyle] Please consider giving the project a star ⭐ on GitHub if you found this extension useful.", "Open GitHub").then((res) => {
+                    if (res === "Open GitHub") {
+                        context.globalState.update("hasShownStarMeDialog", true)
+                        vscode.env.openExternal(vscode.Uri.parse("https://github.com/yy0931/vscode-mplstyle"))
+                    }
+                })
+            }
+        }, 5000)
+    })))
+
     context.subscriptions.push(
         logger,
         diagnosticCollection,
