@@ -340,13 +340,14 @@
 ## settings which map a TeX font name to a fontconfig font pattern.  (These
 ## settings are not used for other font sets.)
 #mathtext.bf:  sans:bold
+#mathtext.bfit: sans:italic:bold
 #mathtext.cal: cursive
 #mathtext.it:  sans:italic
 #mathtext.rm:  sans
 #mathtext.sf:  sans
 #mathtext.tt:  monospace
 #mathtext.fallback: cm  # Select fallback font from ['cm' (Computer Modern), 'stix'
-                        # 'stixsans'] when a symbol can not be found in one of the
+                        # 'stixsans'] when a symbol cannot be found in one of the
                         # custom math fonts. Select 'None' to not perform fallback
                         # and replace the missing character by a dummy symbol.
 #mathtext.default: it  # The default font to use for math.
