@@ -8,7 +8,7 @@ jobs:
       - run: pip3 install matplotlib numpy
       - uses: actions/setup-node@v2
         with:
-          node-version: 16.x
+          node-version: 20.x
       - run: npm ci -D
       - run: npm test
 
