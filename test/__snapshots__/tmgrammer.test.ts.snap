@@ -1,23 +1,23 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`comment only 1`] = `
-Array [
-  Object {
-    "scopes": Array [
+[
+  {
+    "scopes": [
       "source.mplstyle",
     ],
     "token": "  ",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
       "comment.line.number-sign.mplstyle",
       "punctuation.definition.comment.mplstyle",
     ],
     "token": "#",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
       "comment.line.number-sign.mplstyle",
     ],
@@ -27,16 +27,16 @@ Array [
 `;
 
 exports[`key and colon 1`] = `
-Array [
-  Object {
-    "scopes": Array [
+[
+  {
+    "scopes": [
       "source.mplstyle",
       "entity.name.label.mplstyle",
     ],
     "token": "foo.bar",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
       "punctuation.separator.key-value.mapping.mplstyle",
     ],
@@ -46,9 +46,9 @@ Array [
 `;
 
 exports[`key only 1`] = `
-Array [
-  Object {
-    "scopes": Array [
+[
+  {
+    "scopes": [
       "source.mplstyle",
       "entity.name.label.mplstyle",
     ],
@@ -58,51 +58,51 @@ Array [
 `;
 
 exports[`key, value and comment 1`] = `
-Array [
-  Object {
-    "scopes": Array [
+[
+  {
+    "scopes": [
       "source.mplstyle",
       "entity.name.label.mplstyle",
     ],
     "token": "foo.bar",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
       "punctuation.separator.key-value.mapping.mplstyle",
     ],
     "token": ":",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
     ],
     "token": " ",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
       "support.constant.property-value.mplstyle",
       "meta.property-value.mplstyle",
     ],
     "token": "baz",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
     ],
     "token": "  ",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
       "comment.line.number-sign.mplstyle",
       "punctuation.definition.comment.mplstyle",
     ],
     "token": "#",
   },
-  Object {
-    "scopes": Array [
+  {
+    "scopes": [
       "source.mplstyle",
       "comment.line.number-sign.mplstyle",
     ],
