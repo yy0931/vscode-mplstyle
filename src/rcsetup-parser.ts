@@ -318,26 +318,34 @@ const parseValidator = (source: string, opts: CompletionOptions = { none: "None"
             } case "fontstretch": {
                 // https://github.com/matplotlib/matplotlib/blob/6c3412baf6498d070d76ec60ed399329e6de1b6c/lib/matplotlib/rcsetup.py#L390
                 return Type.union(Type.int(), Type.enum(['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'normal', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'], true))
+            } case "greaterthan_minushalf": {
+                return Type.new({
+                    label: "float (x > -0.5)",
+                    check: (x) => {
+                        x = json5Parse(x)
+                        return typeof x === "number" && x > -0.5
+                    },
+                })
+            } case "minor_tick_ndivs": {
+                return Type.union(Type.enum(["auto"], false), Type.new({
+                    label: "int (x >= 0)",
+                    check: (x) => {
+                        x = json5Parse(x)
+                        return typeof x === "number" && Number.isInteger(x) && x >= 0
+                    },
+                }))
+            } case "greaterequal0_lessequal1": {
+                return Type.new({
+                    label: "float (0 <= x <= 1)",
+                    check: (x) => {
+                        x = json5Parse(x)
+                        return typeof x === "number" && 0 <= x && x <= 1
+                    },
+                })
             } default:
                 // unimplemented
                 return Type.new({ label: `${type} (any)`, check: any })
         }
-    } else if (matchExpr(r`_range_validators\["0 <= x <= 1"\]`, source)) { // _range_validators["0 <= x <= 1"]
-        return Type.new({
-            label: "float (0 <= x <= 1)",
-            check: (x) => {
-                x = json5Parse(x)
-                return typeof x === "number" && 0 <= x && x <= 1
-            },
-        })
-    } else if (matchExpr(r`_range_validators\["0 <= x < 1"\]`, source)) {  // _range_validators["0 <= x < 1"]
-        return Type.new({
-            label: "float (0 <= x < 1)",
-            check: (x) => {
-                x = json5Parse(x)
-                return typeof x === "number" && 0 <= x && x < 1
-            },
-        })
     } else if (matchExpr(r`JoinStyle`, source)) { // JoinStyle
         // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/_enums.py#L82-L82
         return Type.enum(["miter", "round", "bevel"])
