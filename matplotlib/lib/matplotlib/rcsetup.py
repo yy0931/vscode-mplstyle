@@ -552,12 +552,12 @@ def validate_sketch(s):
         raise ValueError("Expected a (scale, length, randomness) triplet")
 
 
-def _validate_greaterequal0_lessthan1(s):
+def _validate_greaterthan_minushalf(s):
     s = validate_float(s)
-    if 0 <= s < 1:
+    if s > -0.5:
         return s
     else:
-        raise RuntimeError(f'Value must be >=0 and <1; got {s}')
+        raise RuntimeError(f'Value must be >-0.5; got {s}')
 
 
 def _validate_greaterequal0_lessequal1(s):
@@ -568,10 +568,12 @@ def _validate_greaterequal0_lessequal1(s):
         raise RuntimeError(f'Value must be >=0 and <=1; got {s}')
 
 
-_range_validators = {  # Slightly nicer (internal) API.
-    "0 <= x < 1": _validate_greaterequal0_lessthan1,
-    "0 <= x <= 1": _validate_greaterequal0_lessequal1,
-}
+def _validate_int_greaterequal0(s):
+    s = validate_int(s)
+    if s >= 0:
+        return s
+    else:
+        raise RuntimeError(f'Value must be >=0; got {s}')
 
 
 def validate_hatch(s):
@@ -591,6 +593,24 @@ def validate_hatch(s):
 
 validate_hatchlist = _listify_validator(validate_hatch)
 validate_dashlist = _listify_validator(validate_floatlist)
+
+
+def _validate_minor_tick_ndivs(n):
+    """
+    Validate ndiv parameter related to the minor ticks.
+    It controls the number of minor ticks to be placed between
+    two major ticks.
+    """
+
+    if isinstance(n, str) and n.lower() == 'auto':
+        return n
+    try:
+        n = _validate_int_greaterequal0(n)
+        return n
+    except (RuntimeError, ValueError):
+        pass
+
+    raise ValueError("'tick.minor.ndivs' must be 'auto' or non-negative int")
 
 
 _prop_validators = {
@@ -693,7 +713,7 @@ def cycler(*args, **kwargs):
     elif len(args) == 2:
         pairs = [(args[0], args[1])]
     elif len(args) > 2:
-        _api.nargs_error('cycler', '0-2', len(args))
+        raise _api.nargs_error('cycler', '0-2', len(args))
     else:
         pairs = kwargs.items()
 
@@ -1012,9 +1032,9 @@ _validators = {
     # If "data", axes limits are set close to the data.
     # If "round_numbers" axes limits are set to the nearest round numbers.
     "axes.autolimit_mode": ["data", "round_numbers"],
-    "axes.xmargin": _range_validators["0 <= x <= 1"],  # margin added to xaxis
-    "axes.ymargin": _range_validators["0 <= x <= 1"],  # margin added to yaxis
-    'axes.zmargin': _range_validators["0 <= x <= 1"],  # margin added to zaxis
+    "axes.xmargin": _validate_greaterthan_minushalf,  # margin added to xaxis
+    "axes.ymargin": _validate_greaterthan_minushalf,  # margin added to yaxis
+    "axes.zmargin": _validate_greaterthan_minushalf,  # margin added to zaxis
 
     "polaraxes.grid": validate_bool,  # display polar grid or not
     "axes3d.grid":    validate_bool,  # display 3d grid
@@ -1099,6 +1119,8 @@ _validators = {
     "xtick.minor.bottom":  validate_bool,      # draw bottom minor xticks
     "xtick.major.top":     validate_bool,      # draw top major xticks
     "xtick.major.bottom":  validate_bool,      # draw bottom major xticks
+    # number of minor xticks
+    "xtick.minor.ndivs":   _validate_minor_tick_ndivs,
     "xtick.labelsize":     validate_fontsize,  # fontsize of xtick labels
     "xtick.direction":     ["out", "in", "inout"],  # direction of xticks
     "xtick.alignment":     ["center", "right", "left"],
@@ -1120,6 +1142,8 @@ _validators = {
     "ytick.minor.right":   validate_bool,      # draw right minor yticks
     "ytick.major.left":    validate_bool,      # draw left major yticks
     "ytick.major.right":   validate_bool,      # draw right major yticks
+    # number of minor yticks
+    "ytick.minor.ndivs":   _validate_minor_tick_ndivs,
     "ytick.labelsize":     validate_fontsize,  # fontsize of ytick labels
     "ytick.direction":     ["out", "in", "inout"],  # direction of yticks
     "ytick.alignment":     [
@@ -1149,21 +1173,21 @@ _validators = {
     "figure.max_open_warning": validate_int,
     "figure.raise_window":     validate_bool,
 
-    "figure.subplot.left":   _range_validators["0 <= x <= 1"],
-    "figure.subplot.right":  _range_validators["0 <= x <= 1"],
-    "figure.subplot.bottom": _range_validators["0 <= x <= 1"],
-    "figure.subplot.top":    _range_validators["0 <= x <= 1"],
-    "figure.subplot.wspace": _range_validators["0 <= x < 1"],
-    "figure.subplot.hspace": _range_validators["0 <= x < 1"],
+    "figure.subplot.left":   validate_float,
+    "figure.subplot.right":  validate_float,
+    "figure.subplot.bottom": validate_float,
+    "figure.subplot.top":    validate_float,
+    "figure.subplot.wspace": validate_float,
+    "figure.subplot.hspace": validate_float,
 
     "figure.constrained_layout.use": validate_bool,  # run constrained_layout?
     # wspace and hspace are fraction of adjacent subplots to use for space.
     # Much smaller than above because we don't need room for the text.
-    "figure.constrained_layout.hspace": _range_validators["0 <= x < 1"],
-    "figure.constrained_layout.wspace": _range_validators["0 <= x < 1"],
+    "figure.constrained_layout.hspace": validate_float,
+    "figure.constrained_layout.wspace": validate_float,
     # buffer around the axes, in inches.
-    'figure.constrained_layout.h_pad': validate_float,
-    'figure.constrained_layout.w_pad': validate_float,
+    "figure.constrained_layout.h_pad": validate_float,
+    "figure.constrained_layout.w_pad": validate_float,
 
     ## Saving figure's properties
     'savefig.dpi':          validate_dpi,
@@ -1207,7 +1231,7 @@ _validators = {
     "docstring.hardcopy": validate_bool,
 
     "path.simplify":           validate_bool,
-    "path.simplify_threshold": _range_validators["0 <= x <= 1"],
+    "path.simplify_threshold": _validate_greaterequal0_lessequal1,
     "path.snap":               validate_bool,
     "path.sketch":             validate_sketch,
     "path.effects":            validate_anylist,
