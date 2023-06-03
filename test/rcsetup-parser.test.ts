@@ -139,18 +139,6 @@ describe('parseValidator', () => {
             [["validate_int", "20.5"], rejected],
             [["validate_int", "a"], rejected],
             [["validate_int", ""], rejected],
-
-            [[`_range_validators["0 <= x <= 1"]`, "0"], accepted],
-            [[`_range_validators["0 <= x <= 1"]`, "0.5"], accepted],
-            [[`_range_validators["0 <= x <= 1"]`, "1"], accepted],
-            [[`_range_validators["0 <= x <= 1"]`, "a"], rejected],
-            [[`_range_validators["0 <= x <= 1"]`, ""], rejected],
-
-            [[`_range_validators["0 <= x < 1"]`, "0"], accepted],
-            [[`_range_validators["0 <= x < 1"]`, "0.5"], accepted],
-            [[`_range_validators["0 <= x < 1"]`, "1"], rejected],
-            [[`_range_validators["0 <= x < 1"]`, "a"], rejected],
-            [[`_range_validators["0 <= x < 1"]`, ""], rejected],
         )
     })
     describe("color", () => {
@@ -160,7 +148,6 @@ describe('parseValidator', () => {
             [["validate_color"], isSupersetOfColorType],
             [["validate_color_or_auto"], isSupersetOfColorType],
             [["validate_float"], isNotSupersetOfColorType],
-            [[`_range_validators["0 <= x < 1"]`], isNotSupersetOfColorType],
         )
     })
     describe("label", () => {
@@ -168,7 +155,6 @@ describe('parseValidator', () => {
             [[`["a", "bc"]`], `"a" | "bc"`],
             [["validate_string"], `str`],
             [["validate_int"], `int`],
-            [[`_range_validators["0 <= x <= 1"]`], `float (0 <= x <= 1)`],
             [["validate_floatlist"], `list[float]`],
             [["validate_undefinedtype"], `undefinedtype (any)`],
             [["validate_foo"], `foo (any)`],
