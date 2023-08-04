@@ -183,13 +183,19 @@ const Type = {
         return Type.new({ label: values.map((x) => JSON.stringify(x)).join(" | "), check: (x) => valuesForCheck.includes(caseSensitive ? x : x.toLowerCase()), constants: values })
     },
     /** child[] */
-    list: (child: Type, len: number | null = null, allow_stringlist: boolean = false) => {
+    list: (child: Type, { len = null, allow_stringlist = false, literal_eval = false }: { len?: number | null, allow_stringlist?: boolean, literal_eval?: boolean } = {}) => {
         const left = (allow_stringlist ? "str | " : "") + "list["
         const right = "]" + (len === null ? '' : ` (len=${len})`)
         return Type.new({
             shortLabel: left + child.shortLabel + right,
             label: left + child.label + right,
-            check: (x) => allow_stringlist || (len === null || x.split(",").length === len) && (x.trim() === '' || x.split(",").map((v) => v.trim()).every((v) => child.check(v))),
+            check: (x) => {
+                if (allow_stringlist) { return true }
+                if (literal_eval && /^\[.*\]$|^\(.*\)$/s.test(x)) { x = x.slice(1, -1) }
+                if (len !== null && x.split(",").length !== len) { return false }
+                if (x.trim() === '') { return true }
+                return x.split(",").map((v) => v.trim()).every((v) => child.check(v))
+            },
             constants: child.constants,
             color: child.color,
         })
@@ -305,19 +311,36 @@ const parseValidator = (source: string, opts: CompletionOptions = { none: "None"
                 return Type.new({ label: `cycler`, check: any })
             case "whiskers":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L410
-                return Type.union(Type.list(Type.float(), 2), Type.float())
+                return Type.union(Type.list(Type.float(), { len: 2 }), Type.float())
             case "fillstyle": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L475
                 return { ...Type.enum(["full", "left", "right", "bottom", "top", "none"]), shortLabel: type }
             } case "sketch":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L533
-                return Type.union(Type.list(Type.float(), 3), Type.enum([opts.none]))
+                return Type.union(Type.list(Type.float(), { len: 3 }), Type.enum([opts.none]))
             case "hist_bins": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L765
                 return Type.union(Type.int(), parseValidator("validate_floatlist", opts), Type.enum(["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"], true))
             } case "fontstretch": {
                 // https://github.com/matplotlib/matplotlib/blob/6c3412baf6498d070d76ec60ed399329e6de1b6c/lib/matplotlib/rcsetup.py#L390
                 return Type.union(Type.int(), Type.enum(['ultra-condensed', 'extra-condensed', 'condensed', 'semi-condensed', 'normal', 'semi-expanded', 'expanded', 'extra-expanded', 'ultra-expanded'], true))
+            } case "legend_loc": {
+                // https://github.com/matplotlib/matplotlib/blob/d073a3636662ffb165b830f3b88cc3f1f4f40823/lib/matplotlib/rcsetup.py#L741-L783
+                return Type.union(
+                    Type.enum([
+                        "best",
+                        "upper right", "upper left", "lower left", "lower right", "right",
+                        "center left", "center right", "lower center", "upper center",
+                        "center"]),
+                    Type.new({
+                        label: "int (0 <= x <= 10)",
+                        check: (x) => {
+                            x = json5Parse(x)
+                            return typeof x === "number" && Number.isInteger(x) && 0 <= x && x <= 10
+                        },
+                    }),
+                    Type.list(Type.float(), { len: 2, literal_eval: true }),
+                )
             } case "greaterthan_minushalf": {
                 return Type.new({
                     label: "float (x > -0.5)",
@@ -366,7 +389,7 @@ const parseValidator = (source: string, opts: CompletionOptions = { none: "None"
         }
     } else if (matches = matchExpr(r`_listify_validator\(([^\)]+?)(?:,\s*n=(\d+)\s*)?(?:,\s*allow_stringlist=(True|False)\s*)?\)`, source)) { // _listify_validator(validate_int, n=2)
         const len = (matches[2])
-        return Type.list(parseValidator(matches[1], opts), len === undefined ? null : +len, matches[3] === "True")
+        return Type.list(parseValidator(matches[1], opts), { len: len === undefined ? null : +len, allow_stringlist: matches[3] === "True" })
     } else if (matches = matchExpr(r`_ignorecase\(([^\)]+)\)`, source)) {
         return parseValidator(matches[1], opts)
     } else {
