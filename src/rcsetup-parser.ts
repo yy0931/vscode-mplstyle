@@ -42,14 +42,6 @@ export const parseMplSource = async <Path extends { toString(): string }>(extens
     const propValidators = parseDict(rcsetup.content, '_prop_validators')
     errors.push(...propValidators.err.map((v) => `Error during parsing rcsetup.py: ${v}`))
 
-    // dirty fix
-    for (const item of validators.result) {
-        if (item.key === "ps.papersize") {
-            // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L1156-L1156
-            item.value = JSON.stringify(["auto", "letter", "legal", "ledger", ...Array(11).fill(0).map((_, i) => [`a${i}`, `b${i}`]).flat()])
-        }
-    }
-
     const params = new Map(validators.result.map(({ key, value }) => [key, parseValidator(value, opts)]))
     const cyclerProps = new Map(propValidators.result.map(({ key, value }) => [key, parseValidator(value, opts)]))
 
@@ -74,7 +66,6 @@ const json5Parse = (text: string) => {
 const escapeRegExp = (string: string) => string.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
 
 const trimLineComment = (source: string) => {
-
     let strLiteral: string = ""
     for (let i = 0; i < source.length; i++) {
         const char = source[i]
@@ -365,6 +356,12 @@ const parseValidator = (source: string, opts: CompletionOptions = { none: "None"
                         return typeof x === "number" && 0 <= x && x <= 1
                     },
                 })
+            } case "papersize": {
+                // NOTE: auto is deprecated
+                return Type.enum([
+                    "figure", "auto", "letter", "legal", "ledger",
+                    ...["a", "b"].flatMap((ab) => Array.from(Array(11).keys(), (i) => `${ab}${i}`)),
+                ], false)
             } default:
                 // unimplemented
                 return Type.new({ label: `${type} (any)`, check: any })
