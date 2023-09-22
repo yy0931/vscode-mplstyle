@@ -156,26 +156,33 @@ export const activate = async (context: vscode.ExtensionContext) => {
         if (editor?.document.languageId !== "mplstyle") {
             return
         }
+
+        const ignoredKeys = new Set(vscode.workspace.getConfiguration("mplstyle.diagnostics").get<string[]>("ignoredKeys", []))
+
         const { rc, errors } = mplstyleParser.parseAll(editor.document.getText())
-        errors.push(...Array.from(rc.values()).flat().flatMap(({ pair, line }): { error: string; severity: mplstyleParser.Severity; line: number; columnStart: number; columnEnd: number }[] => {
+        errors.push(...Array.from(rc.values()).flat().flatMap(({ pair, line }): { error: string; severity: mplstyleParser.Severity; line: number; columnStart: number; columnEnd: number, key: string }[] => {
             if (pair.value === null) { return [] }  // missing semicolon
             const type = mpl.params.get(pair.key.text)
-            if (type === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end }] }
+            if (type === undefined) { return [{ error: `Property ${pair.key.text} is not defined`, severity: "Error", line, columnStart: pair.key.start, columnEnd: pair.key.end, key: pair.key.text }] }
             if (type.check(pair.value.text) === false) {
-                return [{ error: `${pair.value.text} is not assignable to ${type.label}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end }]
+                return [{ error: `${pair.value.text} is not assignable to ${type.label}`, severity: "Error", line, columnStart: pair.value.start, columnEnd: pair.value.end, key: pair.key.text }]
             }
             return []
         }))
+
         diagnosticCollection.set(
             editor.document.uri,
-            errors.map((err) => {
-                const d = new vscode.Diagnostic(
-                    new vscode.Range(err.line, err.columnStart, err.line, err.columnEnd), err.error,
-                    vscode.DiagnosticSeverity[err.severity]
-                )
-                d.source = "mplstyle"
-                return d
-            }),
+            errors
+                .filter((err) => !ignoredKeys.has(err.key))
+                .map((err) => {
+                    const d = new vscode.Diagnostic(
+                        new vscode.Range(err.line, err.columnStart, err.line, err.columnEnd), err.error,
+                        vscode.DiagnosticSeverity[err.severity]
+                    )
+                    d.code = `mplstyle-key-${err.key}`
+                    d.source = "mplstyle"
+                    return d
+                }),
         )
     }
 
@@ -198,6 +205,30 @@ export const activate = async (context: vscode.ExtensionContext) => {
             }
         }
     })))
+
+    context.subscriptions.push(vscode.languages.registerCodeActionsProvider({ language: "mplstyle" }, {
+        provideCodeActions(document, range, context, token) {
+            return context.diagnostics
+                .filter(d => typeof d.code === "string" && d.code.startsWith("mplstyle-key-"))
+                .map((d) => {
+                    const key = (d.code as string).slice("mplstyle-key-".length)
+                    const action = new vscode.CodeAction(`Ignore errors on key "${key}"`, vscode.CodeActionKind.QuickFix)
+                    action.diagnostics = [d]
+                    action.command = {
+                        title: "Ignore property",
+                        command: "mplstyle.ignoreKey",
+                        arguments: [key],
+                    }
+                    return action
+                })
+        },
+    }))
+
+    context.subscriptions.push(vscode.commands.registerCommand("mplstyle.ignoreKey", async (key: string) => {
+        if (typeof key !== "string") { return }
+        const cfg = vscode.workspace.getConfiguration("mplstyle.diagnostics")
+        await cfg.update("ignoredKeys", [...cfg.get<string[]>("ignoredKeys", []), key], vscode.ConfigurationTarget.Global)
+    }))
 
     context.subscriptions.push(vscode.languages.registerHoverProvider({ language: "python" }, {
         provideHover(document, position) {

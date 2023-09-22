@@ -120,6 +120,13 @@
 					"type": "string",
 					"default": "None",
 					"minLength": 1
+				},
+				"mplstyle.diagnostics.ignoredKeys": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": []
 				}
 			}
 		},

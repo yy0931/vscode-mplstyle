@@ -11,17 +11,17 @@ export type Severity = "Error" | "Warning"
 export const parseAll = (content: string) => {
     const rc: Map<string, { readonly pair: Pair; readonly line: number }[]> = new Map()
 
-    const errors: { error: string; severity: Severity; line: number; columnStart: number; columnEnd: number }[] = []
+    const errors: { error: string; severity: Severity; line: number; columnStart: number; columnEnd: number, key: string }[] = []
 
     for (const [lineNumber, line] of content.replaceAll('\r', '').split('\n').entries()) {
         const pair = parseLine(line)
         if (pair === null) { continue }
         if (pair.value === null) {
-            errors.push({ error: "Missing colon", severity: "Error", line: lineNumber, columnStart: 0, columnEnd: line.length })
+            errors.push({ error: "Missing colon", severity: "Error", line: lineNumber, columnStart: 0, columnEnd: line.length, key: pair.key.text })
         }
         const param = rc.get(pair.key.text)
         if (param !== undefined) {
-            errors.push({ error: `duplicate key "${pair.key.text}"`, severity: "Error", line: lineNumber, columnStart: pair.key.start, columnEnd: pair.key.end })
+            errors.push({ error: `duplicate key "${pair.key.text}"`, severity: "Error", line: lineNumber, columnStart: pair.key.start, columnEnd: pair.key.end, key: pair.key.text })
             param.push({ pair, line: lineNumber })
         } else {
             rc.set(pair.key.text, [{ pair, line: lineNumber }])
