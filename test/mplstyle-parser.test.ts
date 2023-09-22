@@ -74,6 +74,7 @@ describe('parseAll', () => {
             line: 0,
             columnStart: 0,
             columnEnd: 11,
+            key: "key1 value1",
         }]],
         "duplicate key": [[`key1: value1\nkey1: value2`], [{
             error: `duplicate key "key1"`,
@@ -81,6 +82,7 @@ describe('parseAll', () => {
             line: 1,
             columnStart: 0,
             columnEnd: 4,
+            key: "key1",
         }]]
     })
 })
