@@ -308,7 +308,8 @@ const parseValidator = (source: string, opts: CompletionOptions = { none: "None"
                 return { ...Type.enum(["full", "left", "right", "bottom", "top", "none"]), shortLabel: type }
             } case "sketch":
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L533
-                return Type.union(Type.list(Type.float(), { len: 3 }), Type.enum([opts.none]))
+                const tuple = Type.list(Type.float(), { len: 3 })
+                return Type.union(Type.new({ ...tuple, check: (value) => tuple.check(value) || /^\(.*\)$/s.test(value) && tuple.check(value.slice(1, -1)) }), Type.enum([opts.none]))
             case "hist_bins": {
                 // https://github.com/matplotlib/matplotlib/blob/b09aad279b5dcfc49dcf43e0b064eee664ddaf68/lib/matplotlib/rcsetup.py#L765
                 return Type.union(Type.int(), parseValidator("validate_floatlist", opts), Type.enum(["auto", "sturges", "fd", "doane", "scott", "rice", "sqrt"], true))
