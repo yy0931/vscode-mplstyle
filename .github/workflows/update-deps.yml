@@ -11,6 +11,7 @@ jobs:
       - run: pip3 install numpy
       - name: Install Matplotlib from GitHub
         run: |
+          pip3 install -U pip
           pip3 uninstall matplotlib -y
           git clone --depth=1 -b main https://github.com/matplotlib/matplotlib matplotlib-latest
           pip3 install ./matplotlib-latest
