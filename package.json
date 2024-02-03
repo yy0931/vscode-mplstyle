@@ -28,8 +28,7 @@
 	],
 	"activationEvents": [
 		"onLanguage:mplstyle",
-		"onLanguage:python",
-		"onWebviewPanel:mplstylePreview"
+		"onLanguage:python"
 	],
 	"main": "./src/extension__node.js",
 	"browser": "./src/extension__browser.js",
@@ -70,30 +69,6 @@
 					"default": true,
 					"description": "Controls whether to show images in hover"
 				},
-				"mplstyle.preview.pythonPath": {
-					"type": "string",
-					"default": "",
-					"description": "Path to the Python executable to display previews, e.g. /usr/bin/python3, defaults to the output of `which python3 || which py || which python` (Linux, Mac) or `where python3 || where py || where python` (Windows)"
-				},
-				"mplstyle.preview.activateOnSave": {
-					"type": "boolean",
-					"default": false,
-					"description": "Controls whether to show the preview panel on save"
-				},
-				"mplstyle.preview.codeLens.enabled": {
-					"type": "boolean",
-					"default": true,
-					"description": "Controls whether to show a button to show previewer on the editor"
-				},
-				"mplstyle.preview.userPlots": {
-					"type": "array",
-					"default": [],
-					"uniqueItems": true,
-					"items": {
-						"type": "string"
-					},
-					"markdownDescription": "Adds Python scripts that can be used in the previewer. Example: `[\"/home/foo/plot1.py\", \"/home/foo/plot2.py\"]`"
-				},
 				"mplstyle.completion.keywords.bool": {
 					"type": "array",
 					"items": {
@@ -129,13 +104,7 @@
 					"default": []
 				}
 			}
-		},
-		"commands": [
-			{
-				"title": "mplstyle: Preview",
-				"command": "mplstyle.preview"
-			}
-		]
+		}
 	},
 	"capabilities": {
 		"virtualWorkspaces": true,
@@ -145,10 +114,9 @@
 	},
 	"scripts": {
 		"prepare": "python3 scripts/generate_documentation_images.py",
-		"build": "npm run build:license && npm run build:webview && npm run build:node && npm run build:browser",
-		"watch": "npm run build:license && concurrently \"npm run build:webview -- --watch\" \"npm run build:node -- --watch\" \"npm run build:browser -- --watch\"",
+		"build": "npm run build:license && npm run build:node && npm run build:browser",
+		"watch": "npm run build:license && concurrently \"npm run build:node -- --watch\" \"npm run build:browser -- --watch\"",
 		"build:license": "license-checker --production --csv --out LICENSE-THIRD-PARTY.txt",
-		"build:webview": "shx cp node_modules/@vscode/webview-ui-toolkit/dist/toolkit.js src/preview/webview-ui-toolkit.js && shx cp node_modules/@vscode/codicons/dist/codicon.css src/preview/codicon.css && esbuild --bundle src/preview/webview.ts --outfile=./src/preview/webview.js --target=esnext",
 		"build:node": "esbuild --bundle src/extension.ts --outfile=./src/extension__node.js --external:vscode --target=esnext --format=cjs --platform=node",
 		"build:browser": "esbuild --bundle src/extension.ts --outfile=./src/extension__browser.js --external:vscode --target=esnext --format=cjs --define:process.env.browser=true",
 		"clean": "shx rm -f \"src/**/*.js\" && shx rm -f \"src/**/codicon.css\" && shx rm -f LICENSE-THIRD-PARTY.txt",
@@ -157,23 +125,16 @@
 		"start-browser": "npm run build && vscode-test-web --extensionDevelopmentPath=."
 	},
 	"dependencies": {
-		"@vscode/codicons": "^0.0.33",
-		"@vscode/webview-ui-toolkit": "^1.2.2",
-		"json5": "^2.2.3",
-		"tmp": "^0.2.1",
-		"which": "^3.0.1"
+		"json5": "^2.2.3"
 	},
 	"devDependencies": {
 		"@types/jest": "^29.5.3",
 		"@types/node": "^16.16.3",
-		"@types/tmp": "^0.2.3",
 		"@types/vscode": "^1.60.0",
-		"@types/which": "^3.0.0",
-		"@vscode/test-web": "^0.0.44",
+		"@vscode/test-web": "^0.0.51",
 		"concurrently": "^8.2.0",
 		"esbuild": "^0.18.17",
 		"license-checker": "^25.0.1",
-		"rimraf": "^5.0.1",
 		"shelljs": "^0.8.5",
 		"shx": "^0.3.4",
 		"ts-jest": "^29.1.1",

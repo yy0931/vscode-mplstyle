@@ -22,25 +22,3 @@ jobs:
 
       - name: Test `npm run build:browser`
         run: npm run build:browser
-
-  test_renderer:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.x']
-    steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: "pre-release"
-      run: |
-        python3 -m pip install -U pip
-        python3 -m pip uninstall -y matplotlib
-        python3 -m pip install matplotlib --pre
-        ./test/renderer.test.sh
-    - name: "stable-release"
-      run: |
-        python3 -m pip uninstall -y matplotlib
-        python3 -m pip install matplotlib
-        ./test/renderer.test.sh

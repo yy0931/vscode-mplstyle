@@ -126,16 +126,6 @@ export const activate = async (context: vscode.ExtensionContext) => {
     logger.info(`${context.extension.packageJSON.publisher}.${context.extension.packageJSON.name} ${context.extension.packageJSON.version} running on VSCode ${vscode.version}`)
     logger.info(`extensionUri: ${context.extensionUri}`)
 
-    if (!process.env.browser) {
-        logger.info(`platform: Node.js`)
-        context.subscriptions.push(new ((await import("./preview/main_process")).Previewer)(context.extensionUri, context.extensionPath, logger))
-    } else {
-        logger.info(`platform: browser`)
-        context.subscriptions.push(vscode.commands.registerCommand("mplstyle.preview", () => logger.try(async () => {
-            vscode.window.showInformationMessage(`mplstyle.preview is not supported on browsers`)
-        })))
-    }
-
     const cm = JSON.parse(await readFile(vscode.Uri.joinPath(context.extensionUri, "matplotlib", "cm.json"))) as string[]
     let mpl = await parseMplSource(context.extensionUri, getMatplotlibPathConfig(), vscode.Uri.joinPath, readFile, isNOENT, getKeywords(cm))
     for (const err of mpl.errors) {

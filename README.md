@@ -18,4 +18,3 @@ Intellisense for .mplstyle and matplotlibrc files.
 - [x] Hover provider
 - [x] Type checking
 - [x] Color picker
-- [x] Previewer (requires Python 3.6+ and matplotlib 3.4+)
