@@ -363,6 +363,8 @@ const parseValidator = (source: string, opts: CompletionOptions = { none: "None"
                     "figure", "auto", "letter", "legal", "ledger",
                     ...["a", "b"].flatMap((ab) => Array.from(Array(11).keys(), (i) => `${ab}${i}`)),
                 ], false)
+            } case "marker": {
+                return Type.new({ label: `int | str`, check: any })
             } default:
                 // unimplemented
                 return Type.new({ label: `${type} (any)`, check: any })
